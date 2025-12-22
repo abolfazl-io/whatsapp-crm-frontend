@@ -8,8 +8,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Card } from "@/components/ui/card";
-import { Send, Search, Paperclip, MoreVertical, Phone, Video, Loader2 } from "lucide-react";
+import { Send, Search, Paperclip, MoreVertical, Phone, Video, Loader2, Users, MessageSquare } from "lucide-react"; // Users اضافه شد
 import { cn } from "@/lib/utils";
 
 // تعریف تایپ‌ها
@@ -40,6 +39,17 @@ export default function ChatPage() {
   
   // اتصال سوکت
   const socketRef = useRef<any>(null);
+
+  // 🛠️ توابع کمکی برای تشخیص نام و گروه (مشابه صفحه مخاطبین)
+  const isGroup = (phone: string) => {
+    return phone.includes('-') || phone.length > 15; // معمولا گروه‌ها id طولانی یا '-' دارند
+  };
+
+  const getDisplayName = (contact: { phone: string, pushName?: string }) => {
+    if (contact.pushName) return contact.pushName;
+    if (isGroup(contact.phone)) return "گروه واتساپ"; // یا شناسه گروه
+    return contact.phone; // اگر اسم نداشت، شماره را برگردان
+  };
 
   // ۱. دریافت لیست مکالمات در شروع
   useEffect(() => {
@@ -104,7 +114,7 @@ export default function ChatPage() {
     const chat = conversations.find(c => c.id === selectedChatId);
     if (!chat) return;
 
-    // افزودن پیام به صورت موقت به UI (برای سرعت)
+    // افزودن پیام به صورت موقت به UI
     const optimisticMsg: Message = {
       id: Date.now(),
       text: inputText,
@@ -120,40 +130,33 @@ export default function ChatPage() {
         phone: chat.contact.phone,
         message: optimisticMsg.text
       });
-      // پیام واقعی از سوکت یا پاسخ سرور آپدیت می‌شود، ولی فعلا همین کافیست
     } catch (error) {
       console.error("Send failed", error);
-      // اینجا می‌توانیم پیام ارور نمایش دهیم
     }
   };
 
   const handleNewMessage = (data: any) => {
     const { conversationId, message } = data;
 
-    // ۱. اگر این چت الان باز است، پیام را اضافه کن
     if (selectedChatId === conversationId) {
       setMessages(prev => [...prev, message]);
     }
 
-    // ۲. لیست گفتگوها را آپدیت کن (آوردن به بالا + تغییر متن آخرین پیام)
     setConversations(prev => {
       const chatIndex = prev.findIndex(c => c.id === conversationId);
       if (chatIndex === -1) {
-        // اگر چت جدید است، باید دوباره لیست را فچ کنیم یا دستی بسازیم (فعلا فچ ساده)
         fetchConversations();
         return prev;
       }
 
       const updatedChat = { ...prev[chatIndex] };
-      updatedChat.messages = [message]; // آخرین پیام
+      updatedChat.messages = [message];
       updatedChat.lastMessageAt = new Date().toISOString();
       
-      // اگر چت باز نیست، کانتر را زیاد کن
       if (selectedChatId !== conversationId) {
         updatedChat.unreadCount = (updatedChat.unreadCount || 0) + 1;
       }
 
-      // حذف از جای قبلی و افزودن به اول لیست
       const newChats = [...prev];
       newChats.splice(chatIndex, 1);
       return [updatedChat, ...newChats];
@@ -176,69 +179,80 @@ export default function ChatPage() {
         
         <ScrollArea className="flex-1">
           <div className="flex flex-col">
-            {conversations.map((chat) => (
-              <button
-                key={chat.id}
-                onClick={() => setSelectedChatId(chat.id)}
-                className={cn(
-                  "flex items-center gap-3 p-4 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-right border-b border-slate-100 dark:border-slate-800/50 last:border-0",
-                  selectedChatId === chat.id && "bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30"
-                )}
-              >
-                <Avatar className="h-12 w-12 border-2 border-white dark:border-slate-700 shadow-sm">
-                  {/* اگر عکس پروفایل داشت نشان بده، وگرنه حروف اول */}
-                  <AvatarImage src={chat.contact.profilePicUrl} />
-                  <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-500 text-white">
-                    {chat.contact.pushName ? chat.contact.pushName.substring(0, 2) : chat.contact.phone.substring(0, 2)}
-                  </AvatarFallback>
-                </Avatar>
-                
-                <div className="flex-1 overflow-hidden">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="font-semibold text-slate-900 dark:text-slate-100 truncate">
-                      {chat.contact.pushName || chat.contact.phone}
-                    </span>
-                    <span className="text-xs text-slate-400">
-                      {new Date(chat.lastMessageAt).toLocaleTimeString('fa-IR', {hour: '2-digit', minute:'2-digit'})}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm text-slate-500 truncate max-w-[150px]">
-                      {chat.messages?.[0]?.text || "بدون پیام"}
-                    </p>
-                    {chat.unreadCount > 0 && (
-                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-600 text-[10px] font-bold text-white shadow-sm shadow-blue-300">
-                        {chat.unreadCount}
+            {conversations.map((chat) => {
+              const isChatGroup = isGroup(chat.contact.phone);
+              const displayName = getDisplayName(chat.contact);
+
+              return (
+                <button
+                  key={chat.id}
+                  onClick={() => setSelectedChatId(chat.id)}
+                  className={cn(
+                    "flex items-center gap-3 p-4 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-right border-b border-slate-100 dark:border-slate-800/50 last:border-0",
+                    selectedChatId === chat.id && "bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30"
+                  )}
+                >
+                  <Avatar className="h-12 w-12 border-2 border-white dark:border-slate-700 shadow-sm">
+                    <AvatarImage src={chat.contact.profilePicUrl} />
+                    <AvatarFallback className={cn(
+                        "text-white",
+                        isChatGroup ? "bg-orange-500" : "bg-gradient-to-br from-blue-500 to-purple-500"
+                    )}>
+                      {isChatGroup ? <Users className="h-6 w-6" /> : (displayName[0] || "U")}
+                    </AvatarFallback>
+                  </Avatar>
+                  
+                  <div className="flex-1 overflow-hidden">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="font-semibold text-slate-900 dark:text-slate-100 truncate text-sm" title={displayName}>
+                        {displayName}
                       </span>
-                    )}
+                      <span className="text-[10px] text-slate-400 shrink-0">
+                        {new Date(chat.lastMessageAt).toLocaleTimeString('fa-IR', {hour: '2-digit', minute:'2-digit'})}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs text-slate-500 truncate max-w-[150px]">
+                        {chat.messages?.[0]?.text || "بدون پیام"}
+                      </p>
+                      {chat.unreadCount > 0 && (
+                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-600 text-[10px] font-bold text-white shadow-sm shadow-blue-300">
+                          {chat.unreadCount}
+                        </span>
+                      )}
+                    </div>
                   </div>
-                </div>
-              </button>
-            ))}
+                </button>
+              );
+            })}
           </div>
         </ScrollArea>
       </div>
 
       {/* پنجره اصلی چت */}
       <div className="flex-1 flex flex-col bg-slate-50 dark:bg-slate-950 relative">
-        {selectedChatId ? (
+        {selectedChatId && selectedChatInfo ? (
           <>
             {/* هدر چت */}
             <div className="h-16 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-6 bg-white dark:bg-slate-900 z-10 shadow-sm">
               <div className="flex items-center gap-3">
                 <Avatar>
-                   <AvatarImage src={selectedChatInfo?.contact.profilePicUrl} />
-                   <AvatarFallback className="bg-blue-600 text-white">
-                     {selectedChatInfo?.contact.pushName?.[0]}
+                   <AvatarImage src={selectedChatInfo.contact.profilePicUrl} />
+                   <AvatarFallback className={cn(
+                        "text-white",
+                        isGroup(selectedChatInfo.contact.phone) ? "bg-orange-500" : "bg-blue-600"
+                    )}>
+                     {isGroup(selectedChatInfo.contact.phone) ? <Users className="h-4 w-4" /> : getDisplayName(selectedChatInfo.contact)[0]}
                    </AvatarFallback>
                 </Avatar>
                 <div>
-                  <h3 className="font-bold text-slate-900 dark:text-white">
-                    {selectedChatInfo?.contact.pushName || selectedChatInfo?.contact.phone}
+                  <h3 className="font-bold text-slate-900 dark:text-white text-sm">
+                    {getDisplayName(selectedChatInfo.contact)}
                   </h3>
-                  <p className="text-xs text-green-500 font-medium flex items-center gap-1">
-                    <span className="block w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
-                    آنلاین
+                  <p className="text-[10px] text-slate-500 flex items-center gap-1">
+                    {isGroup(selectedChatInfo.contact.phone) 
+                        ? (selectedChatInfo.contact.pushName ? "گروه" : "گروه (نامشخص)") 
+                        : selectedChatInfo.contact.phone}
                   </p>
                 </div>
               </div>
@@ -252,7 +266,6 @@ export default function ChatPage() {
 
             {/* لیست پیام‌ها */}
             <ScrollArea className="flex-1 p-4 bg-[url('/whatsapp-bg.png')] bg-repeat bg-opacity-5">
-               {/* اگر عکس پس‌زمینه ندارید، کلاس bg-[url...] را حذف کنید یا فایلش را اضافه کنید */}
                <div className="flex flex-col gap-4 max-w-4xl mx-auto py-4">
                  {loading ? (
                     <div className="flex justify-center py-10"><Loader2 className="animate-spin text-blue-500" /></div>
@@ -323,6 +336,3 @@ export default function ChatPage() {
     </div>
   );
 }
-
-// برای آیکون حالت خالی (اگر ایمپورت نشده)
-import { MessageSquare } from "lucide-react";

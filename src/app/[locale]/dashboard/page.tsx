@@ -1,17 +1,50 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { api } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { MessageSquare, Users, Activity, BarChart3 } from "lucide-react";
-import { useTranslations } from "next-intl";
+import { MessageSquare, Users, Activity, BarChart3, Loader2, ArrowUpRight, ArrowDownLeft } from "lucide-react";
+import { 
+  AreaChart, 
+  Area, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  ResponsiveContainer 
+} from 'recharts'; // 👈 ایمپورت‌های نمودار
 
 export default function DashboardPage() {
-  const t = useTranslations('Sidebar'); // یا یک کلید جدید Dashboard بسازید
+  const [stats, setStats] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const res = await api.get('/dashboard/stats');
+        setStats(res.data);
+      } catch (error) {
+        console.error("Failed to load stats", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchStats();
+    const interval = setInterval(fetchStats, 10000); 
+    return () => clearInterval(interval);
+  }, []);
+
+  if (loading && !stats) {
+      return <div className="flex justify-center pt-20"><Loader2 className="animate-spin h-8 w-8 text-blue-500"/></div>;
+  }
 
   return (
     <div className="space-y-8 animate-in fade-in-50 duration-500">
-      {/* هدر صفحه */}
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">داشبورد</h2>
-          <p className="text-muted-foreground mt-2">وضعیت کلی سیستم و فعالیت‌های اخیر ربات.</p>
+          <p className="text-muted-foreground mt-2">خوش آمدید! وضعیت سیستم پایدار است.</p>
         </div>
       </div>
 
@@ -19,59 +52,127 @@ export default function DashboardPage() {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <StatsCard 
           title="کل پیام‌ها" 
-          value="+12,300" 
-          desc="۲۰٪ افزایش نسبت به ماه قبل" 
+          value={stats?.messages.total.toLocaleString()} 
+          desc={`${stats?.messages.today} پیام جدید امروز`} 
           icon={MessageSquare} 
         />
         <StatsCard 
           title="مخاطبین فعال" 
-          value="+573" 
-          desc="۱۵ مخاطب جدید امروز" 
+          value={stats?.contacts.total.toLocaleString()} 
+          desc={`${stats?.contacts.new} مخاطب جدید امروز`} 
           icon={Users} 
         />
         <StatsCard 
           title="وضعیت اتصال" 
-          value="متصل" 
-          desc="پینگ: 45ms" 
+          value={stats?.whatsapp.status === 'CONNECTED' ? 'متصل' : 'قطع'} 
+          desc={`پینگ: ${stats?.whatsapp.ping}`} 
           icon={Activity} 
-          success 
+          success={stats?.whatsapp.status === 'CONNECTED'}
         />
         <StatsCard 
-          title="کمپین‌ها" 
-          value="3 فعال" 
-          desc="۱۲۰۰ پیام در صف ارسال" 
+          title="صف ارسال" 
+          value={stats?.campaigns.active} 
+          desc={`${stats?.campaigns.completed} ارسال موفق`} 
           icon={BarChart3} 
         />
       </div>
 
-      {/* فضای خالی برای نمودار آینده */}
+      {/* بخش نمودار و فعالیت‌ها */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
+        
+        {/* 📊 نمودار فعالیت هفته */}
         <Card className="col-span-4 shadow-sm">
           <CardHeader>
-            <CardTitle>نمودار پیام‌های هفته</CardTitle>
+            <CardTitle>فعالیت هفته (پیام‌های ارسالی و دریافتی)</CardTitle>
           </CardHeader>
-          <CardContent className="pl-2">
-            <div className="h-[200px] flex items-center justify-center text-slate-400 bg-slate-50 rounded-md border border-dashed">
-              نمودار اینجا قرار می‌گیرد...
+          <CardContent className="pl-0">
+            <div className="h-[300px] w-full pr-4">
+               {stats?.chart ? (
+                 <ResponsiveContainer width="100%" height="100%">
+                   <AreaChart data={stats.chart}>
+                     <defs>
+                       <linearGradient id="colorSent" x1="0" y1="0" x2="0" y2="1">
+                         <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8}/>
+                         <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                       </linearGradient>
+                       <linearGradient id="colorReceived" x1="0" y1="0" x2="0" y2="1">
+                         <stop offset="5%" stopColor="#22c55e" stopOpacity={0.8}/>
+                         <stop offset="95%" stopColor="#22c55e" stopOpacity={0}/>
+                       </linearGradient>
+                     </defs>
+                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
+                     <XAxis 
+                        dataKey="date" 
+                        tick={{fontSize: 12, fill: '#6b7280'}} 
+                        axisLine={false}
+                        tickLine={false}
+                     />
+                     <YAxis 
+                        tick={{fontSize: 12, fill: '#6b7280'}} 
+                        axisLine={false}
+                        tickLine={false}
+                     />
+                     <Tooltip 
+                        contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                     />
+                     <Area 
+                        type="monotone" 
+                        dataKey="sent" 
+                        stroke="#3b82f6" 
+                        strokeWidth={2}
+                        fillOpacity={1} 
+                        fill="url(#colorSent)" 
+                        name="ارسالی" 
+                     />
+                     <Area 
+                        type="monotone" 
+                        dataKey="received" 
+                        stroke="#22c55e" 
+                        strokeWidth={2}
+                        fillOpacity={1} 
+                        fill="url(#colorReceived)" 
+                        name="دریافتی" 
+                     />
+                   </AreaChart>
+                 </ResponsiveContainer>
+               ) : (
+                 <div className="h-full flex items-center justify-center text-slate-400">
+                   داده‌ای برای نمایش وجود ندارد
+                 </div>
+               )}
             </div>
           </CardContent>
         </Card>
+
+        {/* لیست فعالیت‌های اخیر */}
         <Card className="col-span-3 shadow-sm">
           <CardHeader>
             <CardTitle>آخرین فعالیت‌ها</CardTitle>
           </CardHeader>
           <CardContent>
-             <div className="space-y-4">
-                <div className="flex items-center">
-                  <span className="w-2 h-2 bg-blue-500 rounded-full ml-2"></span>
-                  <p className="text-sm font-medium">علی به پیام 0912... پاسخ داد</p>
-                  <span className="mr-auto text-xs text-muted-foreground">2 دقیقه پیش</span>
-                </div>
-                <div className="flex items-center">
-                  <span className="w-2 h-2 bg-green-500 rounded-full ml-2"></span>
-                  <p className="text-sm font-medium">کمپین "تخفیف یلدا" شروع شد</p>
-                  <span className="mr-auto text-xs text-muted-foreground">1 ساعت پیش</span>
-                </div>
+             <div className="space-y-6 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+                {stats?.activities?.length > 0 ? (
+                  stats.activities.map((act: any, i: number) => (
+                    <div key={i} className="flex items-start">
+                      <div className={`mt-1 p-1.5 rounded-full shrink-0 ${act.type === 'in' ? 'bg-green-100 text-green-600' : 'bg-blue-100 text-blue-600'}`}>
+                        {act.type === 'in' ? <ArrowDownLeft className="h-4 w-4" /> : <ArrowUpRight className="h-4 w-4" />}
+                      </div>
+                      <div className="mr-3 flex-1 min-w-0">
+                        <p className="text-sm font-medium text-slate-800 dark:text-slate-200 truncate">
+                          {act.text}
+                        </p>
+                        <p className="text-xs text-slate-500 mt-1 truncate">
+                          "{act.subText}"
+                        </p>
+                      </div>
+                      <span className="text-[10px] text-slate-400 whitespace-nowrap mr-2">
+                        {new Date(act.time).toLocaleTimeString('fa-IR', {hour: '2-digit', minute:'2-digit'})}
+                      </span>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-sm text-slate-400 text-center py-8">هنوز فعالیتی ثبت نشده است.</p>
+                )}
              </div>
           </CardContent>
         </Card>
@@ -80,17 +181,18 @@ export default function DashboardPage() {
   );
 }
 
-// کامپوننت کوچک برای کارت‌ها
 function StatsCard({ title, value, desc, icon: Icon, success = false }: any) {
   return (
     <Card className="shadow-sm hover:shadow-md transition-shadow">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-sm font-medium">{title}</CardTitle>
-        <Icon className={`h-4 w-4 ${success ? 'text-green-500' : 'text-muted-foreground'}`} />
+        <Icon className={`h-4 w-4 ${success ? 'text-green-500' : 'text-slate-500'}`} />
       </CardHeader>
       <CardContent>
         <div className={`text-2xl font-bold ${success ? 'text-green-600' : ''}`}>{value}</div>
-        <p className="text-xs text-muted-foreground mt-1">{desc}</p>
+        <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+           {desc}
+        </p>
       </CardContent>
     </Card>
   );
