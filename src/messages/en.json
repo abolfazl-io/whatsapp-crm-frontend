@@ -1,0 +1,25 @@
+{
+  "Common": {
+    "loading": "Loading...",
+    "error": "An error occurred"
+  },
+  "Auth": {
+    "title": "Welcome back",
+    "description": "Enter your email to access your account",
+    "email": "Email",
+    "password": "Password",
+    "loginBtn": "Sign In",
+    "loggingIn": "Signing in...",
+    "success": "Login Successful",
+    "failed": "Invalid email or password"
+  },
+  "Sidebar": {
+    "dashboard": "Dashboard",
+    "inbox": "TeamInbox",
+    "contacts": "Contacts",
+    "bulk": "Bulk Sender",
+    "settings": "Settings",
+    "logout": "Logout",
+    "profile": "Profile"
+  }
+}
