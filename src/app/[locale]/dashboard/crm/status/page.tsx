@@ -1,0 +1,370 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { api } from "@/lib/api"; 
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { 
+  Search, 
+  CheckCircle2, 
+  XCircle, 
+  AlertCircle, 
+  Loader2, 
+  RefreshCcw,
+  Hash,
+  Phone,
+  User,      
+  UserPlus   
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+
+// --- تایپ‌ها ---
+interface Contact {
+  phone: string;
+  pushName?: string;
+}
+
+interface ConversationItem {
+  id: number;
+  status: string;
+  lastMessageAt: string;
+  contact: Contact;
+  assignedTo?: number; 
+}
+
+interface Agent {
+  id: number;
+  name: string;
+}
+
+const formatPhoneNumber = (phone: string) => {
+    if (!phone) return "ناشناس";
+    if (phone.includes('-')) return "گروه";
+    if (phone.startsWith('98')) return '0' + phone.substring(2);
+    return phone;
+};
+
+const StatusBadge = ({ status }: { status: string }) => {
+  const styles: Record<string, string> = {
+    OPEN: "bg-green-100 text-green-700 border-green-200",
+    CLOSED: "bg-slate-100 text-slate-700 border-slate-200",
+    PENDING: "bg-orange-100 text-orange-700 border-orange-200",
+  };
+  const labels: Record<string, string> = {
+    OPEN: "باز",
+    CLOSED: "بسته",
+    PENDING: "در انتظار",
+  };
+  return (
+    <Badge variant="outline" className={cn("px-3 py-1", styles[status] || styles.CLOSED)}>
+      {labels[status] || status}
+    </Badge>
+  );
+};
+
+export default function StatusPage() {
+  const [searchId, setSearchId] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [listLoading, setListLoading] = useState(true);
+  
+  const [result, setResult] = useState<ConversationItem | null>(null);
+  const [error, setError] = useState("");
+  const [recentList, setRecentList] = useState<ConversationItem[]>([]);
+
+  // ایجنت‌ها (از سرور گرفته می‌شود)
+  const [agents, setAgents] = useState<Agent[]>([]);
+  const [selectedAgent, setSelectedAgent] = useState<string>("");
+
+  useEffect(() => {
+    fetchInitialData();
+  }, []);
+
+  const fetchInitialData = async () => {
+    try {
+      // 1. دریافت مکالمات
+      const convRes = await api.get("/whatsapp/conversations");
+      const data: ConversationItem[] = convRes.data;
+      const sorted = data.sort((a, b) => new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime());
+      setRecentList(sorted.slice(0, 10));
+
+      // 2. دریافت ایجنت‌ها (بخش جدید)
+      try {
+        const agentRes = await api.get("/crm/agents");
+        setAgents(agentRes.data);
+      } catch (e) {
+        console.error("خطا در دریافت لیست ایجنت‌ها. شاید هنوز ایجنتی نساخته‌اید.", e);
+      }
+      
+    } catch (err) {
+      console.error("خطا در دریافت لیست اولیه:", err);
+    } finally {
+      setListLoading(false);
+    }
+  };
+
+  const handleCheck = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    if (!searchId) return;
+
+    setLoading(true);
+    setError("");
+    setResult(null);
+    setSelectedAgent("");
+
+    try {
+      const found = recentList.find(r => r.id === Number(searchId));
+      if (found) {
+        setResult(found);
+        if (found.assignedTo) setSelectedAgent(String(found.assignedTo));
+      } else {
+        setError("این شناسه در لیست مکالمات اخیر پیدا نشد.");
+      }
+    } catch (err) {
+      setError("خطا در جستجو.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleChangeStatus = async (newStatus: string) => {
+    if (!result) return;
+    setLoading(true);
+    try {
+      await api.patch(`/crm/conversations/${result.id}/status`, { status: newStatus });
+      
+      const updated = { ...result, status: newStatus };
+      setResult(updated);
+      setRecentList(prev => prev.map(item => item.id === result.id ? updated : item));
+    } catch (err) {
+      alert("خطا در تغییر وضعیت");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAssign = async () => {
+    if (!result || !selectedAgent) return;
+    setLoading(true);
+    try {
+        // ارسال شناسه واقعی ایجنت
+        await api.patch(`/crm/conversations/${result.id}/assign`, { 
+            agentId: Number(selectedAgent) 
+        });
+
+        const updated = { ...result, assignedTo: Number(selectedAgent) };
+        setResult(updated);
+        setRecentList(prev => prev.map(item => item.id === result.id ? updated : item));
+        
+        const agentName = agents.find(a => a.id === Number(selectedAgent))?.name;
+        alert(`گفتگو با موفقیت به ${agentName} اختصاص یافت.`);
+
+    } catch (err) {
+        console.error(err);
+        alert("خطا در اختصاص اپراتور. مطمئن شوید شناسه ایجنت معتبر است.");
+    } finally {
+        setLoading(false);
+    }
+  };
+
+  return (
+    <div className="max-w-5xl mx-auto py-10 space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      
+      <div className="text-center space-y-2">
+        <h1 className="text-3xl font-bold text-slate-900 dark:text-white">پیگیری وضعیت تیکت‌ها</h1>
+        <p className="text-slate-500">مدیریت وضعیت و ارجاع مکالمات به همکاران.</p>
+      </div>
+
+      {/* جستجو */}
+      <Card className="max-w-md mx-auto border-blue-100 shadow-lg shadow-blue-50 dark:shadow-none dark:border-slate-800">
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Search className="h-5 w-5 text-blue-600" />
+            جستجو با شناسه (ID)
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleCheck} className="flex gap-2">
+            <div className="relative flex-1">
+                <Hash className="absolute right-3 top-2.5 h-4 w-4 text-slate-400" />
+                <Input 
+                    placeholder="مثال: 12" 
+                    className="pr-9 font-mono text-lg" 
+                    value={searchId}
+                    onChange={(e) => setSearchId(e.target.value)}
+                    autoFocus
+                />
+            </div>
+            <Button type="submit" disabled={loading || !searchId} className="bg-blue-600 hover:bg-blue-700 w-24">
+              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "بررسی"}
+            </Button>
+          </form>
+          {error && (
+            <div className="mt-4 p-3 bg-red-50 text-red-600 text-sm rounded-lg flex items-center gap-2">
+                <AlertCircle className="h-4 w-4" />
+                {error}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* نتیجه جستجو */}
+      {result && (
+        <Card className="bg-slate-50 dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-800 animate-in zoom-in-95">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <div>
+                    <CardTitle className="text-xl">جزئیات گفتگو #{result.id}</CardTitle>
+                    <CardDescription>
+                        آخرین فعالیت: {new Date(result.lastMessageAt).toLocaleTimeString('fa-IR')}
+                    </CardDescription>
+                </div>
+                <div className="transform scale-125 origin-left">
+                    <StatusBadge status={result.status} />
+                </div>
+            </CardHeader>
+            <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                    {/* اطلاعات کاربر */}
+                    <div className="bg-white dark:bg-slate-950 p-3 rounded border">
+                        <span className="text-slate-500 block text-xs mb-1">شماره کاربر</span>
+                        <span className="font-medium font-mono text-lg dir-ltr flex items-center gap-2 justify-end">
+                            {formatPhoneNumber(result.contact.phone)}
+                            <Phone className="h-4 w-4 text-slate-400" />
+                        </span>
+                    </div>
+                    <div className="bg-white dark:bg-slate-950 p-3 rounded border">
+                        <span className="text-slate-500 block text-xs mb-1">نام (واتساپ)</span>
+                        <span className="font-medium">{result.contact.pushName || "بدون نام"}</span>
+                    </div>
+
+                    {/* نمایش اپراتور فعلی */}
+                    <div className="bg-white dark:bg-slate-950 p-3 rounded border border-blue-100 dark:border-blue-900">
+                        <span className="text-slate-500 block text-xs mb-1">اپراتور مسئول</span>
+                        <div className="flex items-center gap-2 font-medium text-blue-700 dark:text-blue-300">
+                            <User className="h-4 w-4" />
+                            {result.assignedTo 
+                                ? agents.find(a => a.id === result.assignedTo)?.name || `ID: ${result.assignedTo}`
+                                : "تعیین نشده"
+                            }
+                        </div>
+                    </div>
+                </div>
+            </CardContent>
+
+            {/* فوتر: دکمه‌های عملیات */}
+            <CardFooter className="flex flex-col md:flex-row items-stretch md:items-center gap-4 border-t bg-white dark:bg-slate-950 pt-4 rounded-b-lg">
+                
+                {/* بخش اختصاص اپراتور */}
+                <div className="flex-1 flex items-center gap-2 border-l border-slate-100 pl-4 ml-4">
+                    <span className="text-sm text-slate-500 whitespace-nowrap">ارجاع به:</span>
+                    <select 
+                        className="h-9 rounded-md border border-slate-300 bg-white px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-950 dark:border-slate-800"
+                        value={selectedAgent}
+                        onChange={(e) => setSelectedAgent(e.target.value)}
+                        disabled={agents.length === 0}
+                    >
+                        <option value="">
+                            {agents.length === 0 ? "هیچ ایجنتی تعریف نشده" : "انتخاب اپراتور..."}
+                        </option>
+                        {agents.map(agent => (
+                            <option key={agent.id} value={agent.id}>{agent.name}</option>
+                        ))}
+                    </select>
+                    <Button 
+                        size="sm" 
+                        onClick={handleAssign} 
+                        disabled={loading || !selectedAgent || Number(selectedAgent) === result.assignedTo}
+                        className="bg-blue-600 hover:bg-blue-700"
+                    >
+                        {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <UserPlus className="h-4 w-4" />}
+                    </Button>
+                </div>
+
+                {/* بخش تغییر وضعیت */}
+                <div className="flex gap-2 justify-end">
+                    {result.status !== 'OPEN' && (
+                        <Button size="sm" variant="outline" onClick={() => handleChangeStatus('OPEN')} disabled={loading} className="text-green-600 border-green-200 hover:bg-green-50">
+                            <CheckCircle2 className="h-4 w-4 ml-1" /> باز کردن
+                        </Button>
+                    )}
+                    
+                    {result.status !== 'CLOSED' && (
+                        <Button size="sm" variant="outline" onClick={() => handleChangeStatus('CLOSED')} disabled={loading} className="text-slate-600 border-slate-200 hover:bg-slate-100">
+                            <XCircle className="h-4 w-4 ml-1" /> بستن
+                        </Button>
+                    )}
+                </div>
+            </CardFooter>
+        </Card>
+      )}
+
+      {/* لیست ۱۰ مورد آخر */}
+      <div className="space-y-4">
+        <h3 className="text-lg font-semibold text-slate-700 dark:text-slate-300 pr-2 border-r-4 border-blue-500">
+            ۱۰ فعالیت آخر
+        </h3>
+        <div className="bg-white dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
+            {listLoading ? (
+                <div className="flex justify-center py-10"><Loader2 className="h-8 w-8 animate-spin text-slate-400" /></div>
+            ) : recentList.length === 0 ? (
+                <div className="text-center py-8 text-slate-500">هیچ گفتگویی یافت نشد.</div>
+            ) : (
+                <div className="relative w-full overflow-auto">
+                    <table className="w-full text-sm text-right">
+                        <thead className="bg-slate-50 dark:bg-slate-900 text-slate-500 border-b">
+                            <tr>
+                                <th className="px-4 py-3 font-medium">شناسه</th>
+                                <th className="px-4 py-3 font-medium">شماره تماس</th>
+                                <th className="px-4 py-3 font-medium">اپراتور</th>
+                                <th className="px-4 py-3 font-medium">آخرین پیام</th>
+                                <th className="px-4 py-3 font-medium">وضعیت</th>
+                                <th className="px-4 py-3 font-medium text-left">عملیات</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                            {recentList.map((item) => (
+                                <tr key={item.id} className="hover:bg-slate-50/50 transition-colors">
+                                    <td className="px-4 py-3 font-mono text-slate-500">#{item.id}</td>
+                                    <td className="px-4 py-3 font-mono dir-ltr text-right text-blue-600">
+                                        {formatPhoneNumber(item.contact.phone)}
+                                    </td>
+                                    <td className="px-4 py-3 text-slate-600">
+                                        {item.assignedTo 
+                                            ? agents.find(a => a.id === item.assignedTo)?.name || item.assignedTo
+                                            : <span className="text-slate-300 text-xs">آزاد</span>
+                                        }
+                                    </td>
+                                    <td className="px-4 py-3 text-slate-500 text-xs">
+                                        {new Date(item.lastMessageAt).toLocaleDateString('fa-IR')}
+                                    </td>
+                                    <td className="px-4 py-3">
+                                        <StatusBadge status={item.status} />
+                                    </td>
+                                    <td className="px-4 py-3 text-left">
+                                        <Button 
+                                            variant="ghost" 
+                                            size="sm" 
+                                            className="h-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                                            onClick={() => {
+                                                setSearchId(String(item.id));
+                                                setResult(item);
+                                                setSelectedAgent(item.assignedTo ? String(item.assignedTo) : "");
+                                                window.scrollTo({ top: 0, behavior: 'smooth' });
+                                            }}
+                                        >
+                                            مدیریت
+                                        </Button>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            )}
+        </div>
+      </div>
+
+    </div>
+  );
+}
