@@ -69,6 +69,15 @@ export default function ChatPage() {
     return formatPhoneNumber(contact.phone);
   };
 
+  // 👇 تابع جدید برای ساخت آدرس کامل فایل
+  const getFullMediaUrl = (path?: string) => {
+    if (!path) return null;
+    if (path.startsWith("http")) return path;
+    // آدرس سرور را اینجا تنظیم کنید
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+    return `${baseUrl}${path}`;
+  };
+
   // --- هوک‌ها ---
   useEffect(() => {
     fetchConversations();
@@ -203,13 +212,21 @@ export default function ChatPage() {
 
   // --- رندر محتوای پیام (تکست، عکس، فایل) ---
   const renderMessageContent = (msg: Message) => {
+    // تبدیل آدرس نسبی به آدرس کامل
+    const fullMediaUrl = getFullMediaUrl(msg.mediaUrl);
+
     // ۱. اگر عکس باشد
     if (msg.type === 'image') {
       return (
-        <div className="flex flex-col gap-2 max-w-[260px]"> {/* 👈 محدود کردن عرض عکس */}
-           {/* اگر لینک مدیا داشته باشیم نمایش می‌دهیم، وگرنه پلیس‌هولدر */}
-           {msg.mediaUrl ? (
-             <img src={msg.mediaUrl} alt="تصویر" className="rounded-md w-full h-auto object-cover" />
+        <div className="flex flex-col gap-2 max-w-[260px]">
+           {/* اگر لینک مدیا داشته باشیم (با آدرس کامل) نمایش می‌دهیم */}
+           {fullMediaUrl ? (
+             <img 
+                src={fullMediaUrl} 
+                alt="تصویر" 
+                className="rounded-md w-full h-auto object-cover border border-slate-200 dark:border-slate-700 cursor-pointer hover:opacity-90 transition-opacity"
+                onClick={() => window.open(fullMediaUrl, '_blank')} // باز کردن عکس در تب جدید
+             />
            ) : (
              <div className="bg-slate-200 dark:bg-slate-800 h-40 w-full rounded-md flex flex-col items-center justify-center text-slate-500 gap-2 border-2 border-dashed border-slate-300 dark:border-slate-700">
                 <ImageIcon className="h-8 w-8 opacity-50" />
@@ -236,8 +253,8 @@ export default function ChatPage() {
                     <p className="text-sm font-medium truncate dir-ltr">{msg.text.replace('[Document]', 'فایل ضمیمه')}</p>
                     <span className="text-[10px] opacity-70">سند / فایل</span>
                 </div>
-                {msg.mediaUrl && (
-                    <a href={msg.mediaUrl} target="_blank" rel="noopener noreferrer" className="p-2 hover:bg-black/10 rounded-full transition-colors">
+                {fullMediaUrl && (
+                    <a href={fullMediaUrl} target="_blank" rel="noopener noreferrer" className="p-2 hover:bg-black/10 rounded-full transition-colors">
                         <Download className="h-4 w-4" />
                     </a>
                 )}
@@ -255,10 +272,7 @@ export default function ChatPage() {
   return (
     <div className="flex h-[calc(100vh-7rem)] w-full overflow-hidden bg-white dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm mt-2">
       
-      {/* سایدبار لیست چت 
-          - کلاس‌ها اصلاح شدند تا در دسکتاپ (md) همیشه نمایش داده شود 
-          - در موبایل اگر چتی باز باشد مخفی می‌شود
-      */}
+      {/* سایدبار لیست چت */}
       <div className={cn(
           "flex flex-col border-l border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 w-full md:w-80 transition-all duration-300 h-full",
           selectedChatId ? "hidden md:flex" : "flex"
@@ -336,11 +350,11 @@ export default function ChatPage() {
           <>
             <div className="h-16 shrink-0 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-4 bg-white dark:bg-slate-900 z-10">
               <div className="flex items-center gap-3">
-                {/* 👇 دکمه بازگشت (در دسکتاپ هم می‌تواند برای بستن چت استفاده شود) */}
+                {/* دکمه بازگشت برای موبایل */}
                 <Button 
                     variant="ghost" 
                     size="icon" 
-                    className="md:hidden text-slate-500 hover:bg-slate-100" // در موبایل دیده می‌شود
+                    className="md:hidden text-slate-500 hover:bg-slate-100" 
                     onClick={() => setSelectedChatId(null)}
                 >
                     <ArrowRight className="h-5 w-5" />
@@ -356,7 +370,6 @@ export default function ChatPage() {
                 </div>
               </div>
               
-              {/* دکمه بستن چت در دسکتاپ (اختیاری) */}
               <Button variant="ghost" size="icon" className="hidden md:flex text-slate-400" onClick={() => setSelectedChatId(null)}>
                   <X className="h-5 w-5" />
               </Button>
@@ -379,7 +392,7 @@ export default function ChatPage() {
                             : "mr-auto bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-bl-none border-slate-200 dark:border-slate-700"
                        )}>
                        
-                       {/* 👇 استفاده از تابع رندر محتوا (اصلاح شده) */}
+                       {/* نمایش محتوای پیام (اصلاح شده) */}
                        {renderMessageContent(msg)}
 
                        <span className={cn("text-[10px] self-end opacity-70", msg.isFromMe ? "text-blue-100" : "text-slate-400")}>
