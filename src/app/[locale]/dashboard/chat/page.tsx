@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { 
   Send, Search, Paperclip, MoreVertical, Phone, Video, 
-  Loader2, Users, MessageSquare, ArrowRight, Plus, X 
+  Loader2, Users, MessageSquare, ArrowRight, Plus, X,
+  Image as ImageIcon, FileText, Download 
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -19,6 +20,7 @@ interface Message {
   isFromMe: boolean;
   createdAt: string;
   type: 'text' | 'image' | 'document';
+  mediaUrl?: string;
 }
 
 interface Contact {
@@ -43,7 +45,6 @@ export default function ChatPage() {
   const [inputText, setInputText] = useState("");
   const [loadingMessages, setLoadingMessages] = useState(false);
   
-  // استیت‌های چت جدید
   const [isNewChatOpen, setIsNewChatOpen] = useState(false);
   const [newChatPhone, setNewChatPhone] = useState("");
 
@@ -71,9 +72,19 @@ export default function ChatPage() {
   // --- هوک‌ها ---
   useEffect(() => {
     fetchConversations();
-    socketRef.current = io("http://localhost:3000"); 
+    
+    const socketUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+    socketRef.current = io(socketUrl, {
+        transports: ['websocket'],
+        reconnection: true,
+        reconnectionAttempts: 5,
+    });
+
     socketRef.current.on("message:new", (data: any) => handleNewMessage(data));
-    return () => { socketRef.current.disconnect(); };
+
+    return () => { 
+        if (socketRef.current) socketRef.current.disconnect(); 
+    };
   }, []);
 
   useEffect(() => {
@@ -85,7 +96,6 @@ export default function ChatPage() {
 
   useEffect(() => {
     if (selectedChatId) {
-      // اگر آیدی چت منفی بود (یعنی چت جدید و موقت)، پیام‌ها را خالی کن
       if (selectedChatId < 0) {
         setMessages([]);
       } else {
@@ -119,22 +129,17 @@ export default function ChatPage() {
     }
   };
 
-  // --- ایجاد چت جدید ---
+  // --- لاجیک چت ---
   const startNewChat = () => {
     if (!newChatPhone) return;
-    
-    // استانداردسازی شماره برای جستجو
     let searchPhone = newChatPhone.replace(/\D/g, '');
     if (searchPhone.startsWith('09')) searchPhone = '98' + searchPhone.substring(1);
 
-    // ۱. بررسی اینکه آیا این چت قبلاً وجود دارد؟
     const existingChat = conversations.find(c => c.contact.phone === searchPhone);
-    
     if (existingChat) {
       setSelectedChatId(existingChat.id);
     } else {
-      // ۲. اگر وجود ندارد، یک چت موقت بساز
-      const tempId = -Date.now(); // آیدی منفی برای تشخیص موقت بودن
+      const tempId = -Date.now();
       const newChat: Conversation = {
         id: tempId,
         contact: { id: tempId, phone: searchPhone, pushName: 'مخاطب جدید' },
@@ -145,7 +150,6 @@ export default function ChatPage() {
       setConversations([newChat, ...conversations]);
       setSelectedChatId(tempId);
     }
-    
     setIsNewChatOpen(false);
     setNewChatPhone("");
   };
@@ -169,16 +173,12 @@ export default function ChatPage() {
 
     try {
       await api.post("/whatsapp/send/text", {
-        phone: chat.contact.phone, // شماره را می‌فرستیم
+        phone: chat.contact.phone,
         message: optimisticMsg.text
       });
-      
-      // بعد از ارسال موفق، لیست را رفرش کن تا چت موقت تبدیل به چت واقعی (با آیدی دیتابیس) شود
       setTimeout(() => fetchConversations(), 1000);
-
     } catch (error) {
-      console.error("❌ ارسال ناموفق:", error);
-      alert("خطا در ارسال پیام. شماره را چک کنید.");
+      alert("خطا در ارسال پیام.");
     }
   };
 
@@ -188,52 +188,95 @@ export default function ChatPage() {
     
     setConversations(prev => {
       const chatIndex = prev.findIndex(c => c.id === conversationId);
-      if (chatIndex === -1) {
-        fetchConversations(); 
-        return prev;
-      }
+      if (chatIndex === -1) { fetchConversations(); return prev; }
+
       const updatedChat = { ...prev[chatIndex] };
       updatedChat.messages = [message];
       updatedChat.lastMessageAt = new Date().toISOString();
       if (selectedChatId !== conversationId) updatedChat.unreadCount = (updatedChat.unreadCount || 0) + 1;
+      
       const newChats = [...prev];
       newChats.splice(chatIndex, 1);
       return [updatedChat, ...newChats];
     });
   };
 
+  // --- رندر محتوای پیام (تکست، عکس، فایل) ---
+  const renderMessageContent = (msg: Message) => {
+    // ۱. اگر عکس باشد
+    if (msg.type === 'image') {
+      return (
+        <div className="flex flex-col gap-2 max-w-[260px]"> {/* 👈 محدود کردن عرض عکس */}
+           {/* اگر لینک مدیا داشته باشیم نمایش می‌دهیم، وگرنه پلیس‌هولدر */}
+           {msg.mediaUrl ? (
+             <img src={msg.mediaUrl} alt="تصویر" className="rounded-md w-full h-auto object-cover" />
+           ) : (
+             <div className="bg-slate-200 dark:bg-slate-800 h-40 w-full rounded-md flex flex-col items-center justify-center text-slate-500 gap-2 border-2 border-dashed border-slate-300 dark:border-slate-700">
+                <ImageIcon className="h-8 w-8 opacity-50" />
+                <span className="text-[10px] opacity-70">تصویر (بدون پیش‌نمایش)</span>
+             </div>
+           )}
+           {/* نمایش متن کپشن (اگر [Image] نباشد) */}
+           {msg.text && msg.text !== '[Image]' && (
+             <p className="text-sm leading-relaxed px-1">{msg.text}</p>
+           )}
+        </div>
+      );
+    }
+
+    // ۲. اگر فایل باشد
+    if (msg.type === 'document') {
+      return (
+        <div className="flex flex-col gap-1 min-w-[200px]">
+            <div className="flex items-center gap-3 bg-black/5 dark:bg-white/10 p-3 rounded-md">
+                <div className="bg-orange-100 dark:bg-orange-900 p-2 rounded-full shrink-0">
+                    <FileText className="h-5 w-5 text-orange-600 dark:text-orange-300" />
+                </div>
+                <div className="flex-1 overflow-hidden">
+                    <p className="text-sm font-medium truncate dir-ltr">{msg.text.replace('[Document]', 'فایل ضمیمه')}</p>
+                    <span className="text-[10px] opacity-70">سند / فایل</span>
+                </div>
+                {msg.mediaUrl && (
+                    <a href={msg.mediaUrl} target="_blank" rel="noopener noreferrer" className="p-2 hover:bg-black/10 rounded-full transition-colors">
+                        <Download className="h-4 w-4" />
+                    </a>
+                )}
+            </div>
+        </div>
+      );
+    }
+
+    // ۳. پیش‌فرض (متن)
+    return <p className="leading-relaxed whitespace-pre-wrap text-sm">{msg.text}</p>;
+  };
+
   const selectedChatInfo = conversations.find(c => c.id === selectedChatId);
 
   return (
-    <div className="flex h-[calc(100vh-8rem)] w-full overflow-hidden bg-white dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm mt-4">
+    <div className="flex h-[calc(100vh-7rem)] w-full overflow-hidden bg-white dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm mt-2">
       
-      {/* ------------------- سایدبار ------------------- */}
+      {/* سایدبار لیست چت 
+          - کلاس‌ها اصلاح شدند تا در دسکتاپ (md) همیشه نمایش داده شود 
+          - در موبایل اگر چتی باز باشد مخفی می‌شود
+      */}
       <div className={cn(
-          "flex flex-col border-l border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 w-full md:w-80 transition-all duration-300",
+          "flex flex-col border-l border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 w-full md:w-80 transition-all duration-300 h-full",
           selectedChatId ? "hidden md:flex" : "flex"
       )}>
-        {/* هدر: جستجو + دکمه چت جدید */}
         <div className="p-4 border-b border-slate-200 dark:border-slate-800 shrink-0 flex gap-2">
           <div className="relative flex-1">
             <Search className="absolute right-3 top-2.5 h-4 w-4 text-slate-400" />
             <Input placeholder="جستجو..." className="pr-9 bg-white dark:bg-slate-950" />
           </div>
-          <Button 
-            variant="outline" 
-            size="icon" 
-            onClick={() => setIsNewChatOpen(true)}
-            title="گفتگوی جدید"
-            className="bg-white dark:bg-slate-950"
-          >
+          <Button variant="outline" size="icon" onClick={() => setIsNewChatOpen(true)} className="bg-white dark:bg-slate-950">
             <Plus className="h-4 w-4 text-blue-600" />
           </Button>
         </div>
 
-        {/* مودال چت جدید (ساده داخل لیست) */}
         {isNewChatOpen && (
-            <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border-b border-blue-100 dark:border-blue-900 animate-in slide-in-from-top-2">
+            <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border-b border-blue-100 animate-in slide-in-from-top-2">
                 <div className="flex justify-between items-center mb-2">
-                    <span className="text-xs font-bold text-blue-700 dark:text-blue-300">شماره موبایل را وارد کنید:</span>
+                    <span className="text-xs font-bold text-blue-700">شماره موبایل:</span>
                     <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => setIsNewChatOpen(false)}>
                         <X className="h-3 w-3" />
                     </Button>
@@ -243,29 +286,16 @@ export default function ChatPage() {
                         value={newChatPhone}
                         onChange={(e) => setNewChatPhone(e.target.value)}
                         placeholder="0912..." 
-                        className="bg-white dark:bg-slate-950 h-8 text-sm dir-ltr"
+                        className="bg-white h-8 text-sm dir-ltr"
                         autoFocus
                     />
-                    <Button size="sm" onClick={startNewChat} className="h-8 bg-blue-600 hover:bg-blue-700 text-white">
-                        شروع
-                    </Button>
+                    <Button size="sm" onClick={startNewChat} className="h-8 bg-blue-600 text-white">شروع</Button>
                 </div>
             </div>
         )}
         
-        {/* لیست چت‌ها */}
-        <div className="flex-1 overflow-y-auto custom-scrollbar custom-scrollbar">
-          {conversations.length === 0 ? (
-             <div className="text-center text-slate-400 mt-10 text-sm p-4">
-                 هیچ گفتگویی ندارید.<br/>
-                 از دکمه <b>+</b> بالا برای شروع چت استفاده کنید.
-             </div>
-          ) : (
-             conversations.map((chat) => {
-              const displayName = getDisplayName(chat.contact);
-              const isChatGroup = isGroup(chat.contact.phone);
-
-              return (
+        <div className="flex-1 overflow-y-auto custom-scrollbar">
+             {conversations.map((chat) => (
                 <button
                   key={chat.id}
                   onClick={() => setSelectedChatId(chat.id)}
@@ -274,88 +304,84 @@ export default function ChatPage() {
                     selectedChatId === chat.id && "bg-blue-50 dark:bg-blue-900/20"
                   )}
                 >
-                  <Avatar className="h-12 w-12 border border-slate-200 dark:border-slate-700">
+                  <Avatar className="h-12 w-12 border">
                     <AvatarImage src={chat.contact.profilePicUrl} />
-                    <AvatarFallback className={cn("text-white", isChatGroup ? "bg-orange-500" : "bg-blue-500")}>
-                      {isChatGroup ? <Users className="h-5 w-5" /> : (displayName[0] || "U")}
-                    </AvatarFallback>
+                    <AvatarFallback className="bg-blue-500 text-white">{getDisplayName(chat.contact)[0]}</AvatarFallback>
                   </Avatar>
-                  
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between mb-1">
-                      <span className="font-semibold text-slate-900 dark:text-slate-100 truncate text-sm">
-                        {displayName}
-                      </span>
-                      <span className="text-[10px] text-slate-400 shrink-0">
-                        {chat.lastMessageAt ? new Date(chat.lastMessageAt).toLocaleTimeString('fa-IR', {hour: '2-digit', minute:'2-digit'}) : ''}
-                      </span>
+                      <span className="font-semibold text-sm truncate">{getDisplayName(chat.contact)}</span>
+                      <span className="text-[10px] text-slate-400">{chat.lastMessageAt ? new Date(chat.lastMessageAt).toLocaleTimeString('fa-IR', {hour: '2-digit', minute:'2-digit'}) : ''}</span>
                     </div>
                     <div className="flex items-center justify-between">
                       <p className="text-xs text-slate-500 truncate max-w-[140px] dir-rtl text-right">
-                        {chat.messages?.[0]?.text || "..."}
+                          {chat.messages?.[0]?.type === 'image' ? '📷 تصویر' : chat.messages?.[0]?.text || "..."}
                       </p>
                       {chat.unreadCount > 0 && (
-                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-600 text-[10px] font-bold text-white">
-                          {chat.unreadCount}
-                        </span>
+                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-600 text-[10px] font-bold text-white">{chat.unreadCount}</span>
                       )}
                     </div>
                   </div>
                 </button>
-              );
-            })
-          )}
+            ))}
         </div>
       </div>
 
-      {/* ------------------- پنجره چت ------------------- */}
+      {/* پنجره چت */}
       <div className={cn(
-          "flex-1 flex flex-col bg-slate-50 dark:bg-slate-950 relative h-full",
+          "flex-1 flex flex-col bg-slate-50 dark:bg-slate-950 relative h-full transition-all duration-300",
           !selectedChatId ? "hidden md:flex" : "flex"
       )}>
         {selectedChatId && selectedChatInfo ? (
           <>
-            {/* هدر چت */}
             <div className="h-16 shrink-0 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-4 bg-white dark:bg-slate-900 z-10">
               <div className="flex items-center gap-3">
-                <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setSelectedChatId(null)}>
+                {/* 👇 دکمه بازگشت (در دسکتاپ هم می‌تواند برای بستن چت استفاده شود) */}
+                <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="md:hidden text-slate-500 hover:bg-slate-100" // در موبایل دیده می‌شود
+                    onClick={() => setSelectedChatId(null)}
+                >
                     <ArrowRight className="h-5 w-5" />
                 </Button>
+
                 <Avatar>
                    <AvatarImage src={selectedChatInfo.contact.profilePicUrl} />
-                   <AvatarFallback className="bg-blue-600 text-white">
-                     {getDisplayName(selectedChatInfo.contact)[0]}
-                   </AvatarFallback>
+                   <AvatarFallback className="bg-blue-600 text-white">{getDisplayName(selectedChatInfo.contact)[0]}</AvatarFallback>
                 </Avatar>
                 <div>
-                  <h3 className="font-bold text-slate-900 dark:text-white text-sm">
-                    {getDisplayName(selectedChatInfo.contact)}
-                  </h3>
-                  <p className="text-[10px] text-green-600 flex items-center gap-1 font-mono">
-                    {formatPhoneNumber(selectedChatInfo.contact.phone)}
-                  </p>
+                  <h3 className="font-bold text-sm">{getDisplayName(selectedChatInfo.contact)}</h3>
+                  <p className="text-[10px] text-green-600 font-mono">{formatPhoneNumber(selectedChatInfo.contact.phone)}</p>
                 </div>
               </div>
+              
+              {/* دکمه بستن چت در دسکتاپ (اختیاری) */}
+              <Button variant="ghost" size="icon" className="hidden md:flex text-slate-400" onClick={() => setSelectedChatId(null)}>
+                  <X className="h-5 w-5" />
+              </Button>
             </div>
 
-            {/* پیام‌ها */}
             <div className="flex-1 overflow-y-auto p-4 bg-[url('/whatsapp-bg.png')] bg-repeat bg-opacity-5 space-y-4 custom-scrollbar">
                  {loadingMessages ? (
                     <div className="flex justify-center py-10"><Loader2 className="animate-spin text-blue-500" /></div>
                  ) : messages.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-full text-slate-400 opacity-70">
                       <MessageSquare className="h-12 w-12 mb-2" />
-                      <p>
-                          {selectedChatId < 0 ? "اولین پیام را ارسال کنید تا گفتگو ایجاد شود." : "هنوز پیامی نیست."}
-                      </p>
+                      <p>هنوز پیامی نیست.</p>
                     </div>
                  ) : (
                    messages.map((msg) => (
                      <div key={msg.id} className={cn(
-                         "flex w-max max-w-[75%] flex-col gap-1 rounded-lg px-3 py-2 text-sm shadow-sm",
-                         msg.isFromMe ? "ml-auto bg-blue-600 text-white rounded-br-none" : "mr-auto bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-bl-none border"
+                         "flex w-max max-w-[85%] md:max-w-[70%] flex-col gap-1 rounded-lg px-3 py-2 shadow-sm border",
+                         msg.isFromMe 
+                            ? "ml-auto bg-blue-600 text-white rounded-br-none border-blue-600" 
+                            : "mr-auto bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-bl-none border-slate-200 dark:border-slate-700"
                        )}>
-                       <p className="leading-relaxed whitespace-pre-wrap">{msg.text}</p>
+                       
+                       {/* 👇 استفاده از تابع رندر محتوا (اصلاح شده) */}
+                       {renderMessageContent(msg)}
+
                        <span className={cn("text-[10px] self-end opacity-70", msg.isFromMe ? "text-blue-100" : "text-slate-400")}>
                          {new Date(msg.createdAt).toLocaleTimeString('fa-IR', {hour:'2-digit', minute:'2-digit'})}
                        </span>
@@ -365,7 +391,6 @@ export default function ChatPage() {
                  <div ref={scrollRef} className="h-1" />
             </div>
 
-            {/* ورودی پیام */}
             <div className="p-3 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 shrink-0">
               <form onSubmit={handleSendMessage} className="flex items-center gap-2">
                 <Button type="button" variant="ghost" size="icon" className="text-slate-400"><Paperclip className="h-5 w-5" /></Button>
@@ -379,7 +404,7 @@ export default function ChatPage() {
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center text-slate-400 bg-slate-50/30">
              <div className="w-24 h-24 bg-slate-100 dark:bg-slate-900 rounded-full flex items-center justify-center mb-4"><MessageSquare className="h-10 w-10 text-slate-300" /></div>
-             <p>یک گفتگو را انتخاب کنید یا چت جدید بسازید.</p>
+             <p>یک گفتگو را انتخاب کنید.</p>
           </div>
         )}
       </div>

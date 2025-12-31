@@ -1,16 +1,32 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
+import { api } from "@/lib/api"; // فرض بر این است که api شما تنظیم شده است
 import { 
   Users, 
   Tags, 
   Briefcase, 
-  Settings, 
+  Zap, // آیکون برای پاسخ‌های آماده
   ArrowRight,
-  UserPlus
+  UserPlus,
+  Loader2
 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+
+// تعریف اینترفیس برای آمار دریافتی از سرور
+interface CrmStats {
+  contacts: {
+    total: number;
+    new: number;
+  };
+  messages: {
+    total: number;
+    today: number;
+  };
+  // سایر فیلدهایی که بک‌ند می‌فرستد...
+}
 
 const crmSections = [
   {
@@ -22,12 +38,12 @@ const crmSections = [
     action: "مشاهده لیست"
   },
   {
-    title: "تگ‌ها و دسته‌بندی",
-    description: "تعریف برچسب‌های رنگی برای تفکیک مشتریان (VIP، جدید و...).",
-    icon: Tags,
-    href: "/dashboard/crm/tags",
+    title: "پاسخ‌های آماده", // تغییر به صفحه‌ای که دارید
+    description: "مدیریت متن‌های پرتکرار برای پاسخ‌دهی سریع.",
+    icon: Zap,
+    href: "/dashboard/crm/canned-responses",
     color: "text-purple-600 bg-purple-50",
-    action: "مدیریت تگ‌ها"
+    action: "مدیریت پیام‌ها"
   },
   {
     title: "اپراتورها",
@@ -38,16 +54,36 @@ const crmSections = [
     action: "مدیریت تیم"
   },
   {
-    title: "تنظیمات CRM",
-    description: "تنظیم فیلدهای اختصاصی و پیکربندی سیستم.",
-    icon: Settings,
-    href: "/dashboard/crm/settings",
+    title: "بررسی وضعیت", // لینک به صفحه وضعیت
+    description: "مشاهده وضعیت اتصال واتساپ و لاگ‌ها.",
+    icon: Users, // یا آیکون Activity
+    href: "/dashboard/crm/status",
     color: "text-slate-600 bg-slate-50",
-    action: "تنظیمات"
+    action: "مشاهده وضعیت"
   }
 ];
 
 export default function CrmDashboard() {
+  const [stats, setStats] = useState<CrmStats | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  // دریافت آمار از سرور
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        // این اندپوینت را در AppController دارید: getStats
+        const res = await api.get("/dashboard/stats"); 
+        setStats(res.data);
+      } catch (error) {
+        console.error("خطا در دریافت آمار:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchStats();
+  }, []);
+
   return (
     <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in duration-500 py-6">
       
@@ -61,10 +97,11 @@ export default function CrmDashboard() {
           </p>
         </div>
         
-        <Link href="/dashboard/crm/contacts/new">
+        {/* دکمه افزودن مشتری (در حال حاضر مودال ندارد، به لیست می‌رود) */}
+        <Link href="/dashboard/crm/contacts">
             <Button className="bg-blue-600 hover:bg-blue-700">
                 <UserPlus className="mr-2 h-4 w-4" />
-                افزودن مشتری جدید
+                لیست مشتریان
             </Button>
         </Link>
       </div>
@@ -97,34 +134,48 @@ export default function CrmDashboard() {
         ))}
       </div>
 
-      {/* بخش آمار سریع (مثال) */}
+      {/* بخش آمار واقعی (متصل به بک‌ند) */}
       <div className="grid gap-4 md:grid-cols-4">
-          <Card className="bg-slate-50 dark:bg-slate-900 border-none">
-              <CardContent className="p-6 text-center">
-                  <div className="text-3xl font-bold text-slate-900 dark:text-white">1,240</div>
-                  <div className="text-xs text-muted-foreground mt-1">کل مشتریان</div>
-              </CardContent>
-          </Card>
-          <Card className="bg-slate-50 dark:bg-slate-900 border-none">
-              <CardContent className="p-6 text-center">
-                  <div className="text-3xl font-bold text-green-600">85</div>
-                  <div className="text-xs text-muted-foreground mt-1">مشتریان جدید (هفته)</div>
-              </CardContent>
-          </Card>
-          <Card className="bg-slate-50 dark:bg-slate-900 border-none">
-              <CardContent className="p-6 text-center">
-                  <div className="text-3xl font-bold text-blue-600">12</div>
-                  <div className="text-xs text-muted-foreground mt-1">تگ‌های فعال</div>
-              </CardContent>
-          </Card>
-          <Card className="bg-slate-50 dark:bg-slate-900 border-none">
-              <CardContent className="p-6 text-center">
-                  <div className="text-3xl font-bold text-orange-600">5</div>
-                  <div className="text-xs text-muted-foreground mt-1">اپراتورهای آنلاین</div>
-              </CardContent>
-          </Card>
+          <StatCard 
+            title="کل مشتریان" 
+            value={stats?.contacts.total} 
+            loading={loading} 
+            color="text-slate-900 dark:text-white"
+          />
+          <StatCard 
+            title="مشتریان جدید (امروز)" 
+            value={stats?.contacts.new} 
+            loading={loading} 
+            color="text-green-600"
+          />
+          <StatCard 
+            title="کل پیام‌ها" 
+            value={stats?.messages.total} 
+            loading={loading} 
+            color="text-blue-600"
+          />
+          <StatCard 
+            title="پیام‌های امروز" 
+            value={stats?.messages.today} 
+            loading={loading} 
+            color="text-orange-600"
+          />
       </div>
 
     </div>
   );
+}
+
+// کامپوننت کوچک برای نمایش کارت آمار
+function StatCard({ title, value, loading, color }: { title: string, value?: number, loading: boolean, color: string }) {
+    return (
+        <Card className="bg-slate-50 dark:bg-slate-900 border-none">
+            <CardContent className="p-6 text-center">
+                <div className={`text-3xl font-bold ${color}`}>
+                    {loading ? <Loader2 className="h-8 w-8 animate-spin mx-auto opacity-50" /> : (value || 0)}
+                </div>
+                <div className="text-xs text-muted-foreground mt-1">{title}</div>
+            </CardContent>
+        </Card>
+    );
 }
