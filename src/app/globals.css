@@ -123,3 +123,38 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* src/app/globals.css */
+
+@layer utilities {
+  /* اسکرول‌بار باریک و مدرن */
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;               /* عرض اسکرول عمودی */
+    height: 6px;              /* ارتفاع اسکرول افقی */
+  }
+
+  /* مسیر اسکرول (Background) */
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;  /* شفاف باشد */
+  }
+
+  /* خود دستگیره اسکرول (Thumb) */
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background-color: #e2e8f0; /* رنگ طوسی روشن (slate-200) */
+    border-radius: 20px;       /* کاملاً گرد */
+  }
+
+  /* وقتی موس روی اسکرول می‌رود */
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background-color: #cbd5e1; /* کمی تیره‌تر (slate-300) */
+  }
+
+  /* حالت دارک مود (Dark Mode) */
+  .dark .custom-scrollbar::-webkit-scrollbar-thumb {
+    background-color: #334155; /* رنگ طوسی تیره (slate-700) */
+  }
+
+  .dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background-color: #475569; /* کمی روشن‌تر (slate-600) */
+  }
+}
