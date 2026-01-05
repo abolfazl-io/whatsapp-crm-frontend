@@ -28,7 +28,7 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-
+import { ShieldCheck } from "lucide-react"; 
 // 1. تعریف تایپ برای کاربر و آیتم‌های منو
 interface UserData {
   name?: string;
@@ -128,6 +128,12 @@ export function Sidebar() {
       icon: Bot,
       roles: ['ADMIN'] // 👈 فقط ادمین
     }, 
+    {
+      name: "سرویس OTP",
+      href: "/dashboard/otp",
+      icon: ShieldCheck, // یا Lock
+    },
+          
     
     // 👇 بخش CRM
     {
@@ -166,7 +172,7 @@ export function Sidebar() {
             icon: Zap, 
             roles: ['ADMIN', 'AGENT'] 
           },
-          
+
         ]
     },
 

@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2 } from "lucide-react";
+import Link from "next/link";
 
 export default function LoginPage() { // 👈 پارامتر params را از اینجا حذف کردیم
   const t = useTranslations('Auth');
@@ -110,9 +111,12 @@ export default function LoginPage() { // 👈 پارامتر params را از ا
                 t('loginBtn')
               )}
             </Button>
-            <Button variant="outline" className="w-full h-11">
+            {/* <Button variant="outline" className="w-full h-11">
               ورود با گوگل
-            </Button>
+            </Button> */}
+            <div className="mt-4 text-center text-sm">
+              <Link href={`/${locale}/register`} className="text-slate-500 hover:text-blue-600 hover:underline">{t('noAccount')}</Link>
+          </div>
           </form>
         </div>
       </div>
