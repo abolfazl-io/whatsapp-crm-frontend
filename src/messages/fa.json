@@ -62,7 +62,13 @@
     "disconnected": "قطع",
     "newToday": "جدید امروز",
     "chartTitle": "فعالیت هفته (پیام‌های ارسالی و دریافتی)",
-    "recentActivity": "آخرین فعالیت‌ها"
+    "recentActivity": "آخرین فعالیت‌ها",
+    "newMessages": "{count} پیام جدید امروز",
+    "newContacts": "{count} مخاطب جدید",
+    "ping": "پینگ: {value} میلی‌ثانیه",
+    "sentSuccessfully": "{count} ارسال موفق",
+    "sent": "ارسال شده",
+    "received": "دریافت شده"
   },
   "Chat": {
     "search": "Search...",
@@ -238,7 +244,10 @@
     "alertErrorServer": "خطا در ارتباط با سرور.",
     "deleteConfirm": "آیا از حذف این مورد اطمینان دارید؟",
     "registered": "ثبت شد",
-    "errorTitle": "خطا"
+    "errorTitle": "خطا",
+    "aiMode": "هوش مصنوعی ترکیبی",
+    "aiActive": "پاسخگویی خودکار فعال است",
+    "aiInactive": "فقط کلمات کلیدی کار می‌کنند"
   },
   "Contacts": {
     "title": "مخاطبین و گروه‌ها",

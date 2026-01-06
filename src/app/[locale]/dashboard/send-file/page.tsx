@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { api } from "@/lib/api"; // استفاده از کتابخانه api مرکزی
-import { useTranslations } from "next-intl"; // 👈 هوک ترجمه
+import { useTranslations } from "next-intl"; 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -11,8 +11,8 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Send, Phone, Link as LinkIcon, FileText, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
 
 export default function SendFileUrlPage() {
-  const t = useTranslations('SendFile'); // 👈 کلید اختصاصی جدید
-  const tCommon = useTranslations('Common'); // برای پیام‌های عمومی مثل خطا
+  const t = useTranslations('SendFile'); 
+  const tCommon = useTranslations('Common'); 
 
   const [phone, setPhone] = useState("");
   const [fileUrl, setFileUrl] = useState("");
@@ -60,7 +60,7 @@ export default function SendFileUrlPage() {
         caption: caption || ""
       };
 
-      // استفاده از api.post بجای fetch دستی (توکن و هدرها خودکار مدیریت می‌شوند)
+      // ارسال درخواست
       await api.post("/whatsapp/send-file", payload);
 
       setStatus({ type: 'success', msg: t('success') });
@@ -71,9 +71,16 @@ export default function SendFileUrlPage() {
       setCaption("");
 
     } catch (error: any) {
-      console.error("File Send Error:", error);
-      // مدیریت خطا با استفاده از ترجمه عمومی یا پیام سرور
-      const errorMsg = error.response?.data?.message || tCommon('error');
+      // ✅ استفاده از warn برای جلوگیری از قرمز شدن کنسول
+      console.warn("File Send Failed:", error.message);
+
+      let errorMsg = error.response?.data?.message || tCommon('error');
+
+      // 🛑 مدیریت اختصاصی خطای عدم دسترسی (۴۰۳)
+      if (error.response && error.response.status === 403) {
+        errorMsg = "⛔ شما مجوز ارسال فایل را ندارید.";
+      }
+
       setStatus({ type: 'error', msg: errorMsg });
     } finally {
       setLoading(false);

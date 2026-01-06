@@ -9,10 +9,10 @@ import { Input } from "@/components/ui/input";
 import { 
   Send, Search, Paperclip, MoreVertical, Phone, Video, 
   Loader2, Users, MessageSquare, ArrowRight, Plus, X,
-  Image as ImageIcon, FileText, Download 
+  Image as ImageIcon, FileText, Download, ShieldAlert // 👈 آیکون امنیتی اضافه شد
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useTranslations } from "next-intl"; // 👈 ۱. اضافه شده
+import { useTranslations } from "next-intl"; 
 
 // --- تایپ‌ها ---
 interface Message {
@@ -40,14 +40,18 @@ interface Conversation {
 }
 
 export default function ChatPage() {
-  const t = useTranslations('Chat'); // 👈 ۲. هوک ترجمه
+  const t = useTranslations('Chat');
 
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedChatId, setSelectedChatId] = useState<number | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState("");
-  const [loadingMessages, setLoadingMessages] = useState(false);
   
+  // وضعیت‌ها
+  const [loadingMessages, setLoadingMessages] = useState(false);
+  const [loading, setLoading] = useState(true); // 👈 لودینگ اولیه
+  const [permissionDenied, setPermissionDenied] = useState(false); // 👈 وضعیت عدم دسترسی
+
   const [isNewChatOpen, setIsNewChatOpen] = useState(false);
   const [newChatPhone, setNewChatPhone] = useState("");
 
@@ -58,21 +62,20 @@ export default function ChatPage() {
   const isGroup = (phone: string) => phone.includes('-') || phone.length > 15;
 
   const formatPhoneNumber = (phone: string) => {
-    if (!phone) return t('unknown'); // 👈 ترجمه
-    if (isGroup(phone)) return t('group'); // 👈 ترجمه
+    if (!phone) return t('unknown');
+    if (isGroup(phone)) return t('group');
     if (phone.startsWith('98') && phone.length >= 10) return '0' + phone.substring(2);
     if (phone.startsWith('+98')) return '0' + phone.substring(3);
     return phone;
   };
 
   const getDisplayName = (contact?: Contact) => {
-    if (!contact) return t('unknownUser'); // 👈 ترجمه
+    if (!contact) return t('unknownUser');
     if (contact.pushName) return contact.pushName;
-    if (isGroup(contact.phone)) return t('whatsappGroup'); // 👈 ترجمه
+    if (isGroup(contact.phone)) return t('whatsappGroup');
     return formatPhoneNumber(contact.phone);
   };
 
-  // تابع جدید برای ساخت آدرس کامل فایل
   const getFullMediaUrl = (path?: string) => {
     if (!path) return null;
     if (path.startsWith("http")) return path;
@@ -82,19 +85,23 @@ export default function ChatPage() {
 
   // --- هوک‌ها ---
   useEffect(() => {
-    fetchConversations();
-    
-    const socketUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
-    socketRef.current = io(socketUrl, {
-        transports: ['websocket'],
-        reconnection: true,
-        reconnectionAttempts: 5,
-    });
+    // جلوگیری از اتصال مجدد در صورت وجود اتصال
+    if (!socketRef.current) {
+        const socketUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+        socketRef.current = io(socketUrl, {
+            transports: ['websocket'],
+            reconnection: true,
+            reconnectionAttempts: 5,
+        });
 
-    socketRef.current.on("message:new", (data: any) => handleNewMessage(data));
+        socketRef.current.on("message:new", (data: any) => handleNewMessage(data));
+    }
+
+    fetchConversations();
 
     return () => { 
         if (socketRef.current) socketRef.current.disconnect(); 
+        socketRef.current = null;
     };
   }, []);
 
@@ -123,8 +130,17 @@ export default function ChatPage() {
     try {
       const res = await api.get("/whatsapp/conversations");
       setConversations(res.data);
-    } catch (error) {
-      console.error("❌ Error fetching chats:", error);
+      setPermissionDenied(false); // ✅ اگر موفق شد، یعنی دسترسی دارد
+    } catch (error: any) {
+      // 🛑 مدیریت خطای ۴۰۳ (عدم دسترسی)
+      if (error.response && error.response.status === 403) {
+        setPermissionDenied(true);
+        console.warn("Inbox Access Denied: User permissions restricted.");
+      } else {
+        console.error("❌ Error fetching chats:", error);
+      }
+    } finally {
+        setLoading(false);
     }
   };
 
@@ -183,27 +199,20 @@ export default function ChatPage() {
     setInputText("");
 
     try {
-      // 👇 اصلاح و استانداردسازی شماره موبایل قبل از ارسال به سرور
       let targetPhone = chat.contact.phone;
-      
-      // ۱. حذف تمام کاراکترهای غیر عددی (مثل + یا - یا فاصله)
       targetPhone = targetPhone.replace(/\D/g, ''); 
-      
-      // ۲. اگر با 09 شروع می‌شود، 0 را با 98 عوض کن
       if (targetPhone.startsWith('09')) {
         targetPhone = '98' + targetPhone.substring(1);
-      }
-      // ۳. اگر ۱۰ رقم است و با 9 شروع می‌شود (مثل 912...)، 98 را اضافه کن
-      else if (targetPhone.length === 10 && targetPhone.startsWith('9')) {
+      } else if (targetPhone.length === 10 && targetPhone.startsWith('9')) {
         targetPhone = '98' + targetPhone;
       }
 
-      // ارسال درخواست با شماره اصلاح شده
       await api.post("/whatsapp/send/text", {
         phone: targetPhone, 
         message: optimisticMsg.text
       });
       
+      // آپدیت لیست گفتگوها برای نمایش آخرین پیام
       setTimeout(() => fetchConversations(), 1000);
     } catch (error) {
       console.error(error);
@@ -230,7 +239,6 @@ export default function ChatPage() {
     });
   };
 
-  // --- رندر محتوای پیام (تکست، عکس، فایل) ---
   const renderMessageContent = (msg: Message) => {
     const fullMediaUrl = getFullMediaUrl(msg.mediaUrl);
 
@@ -241,13 +249,14 @@ export default function ChatPage() {
              <img 
                 src={fullMediaUrl} 
                 alt="Image" 
+                onLoad={() => scrollRef.current?.scrollIntoView({ behavior: "smooth" })} // اسکرول پس از لود عکس
                 className="rounded-md w-full h-auto object-cover border border-slate-200 dark:border-slate-700 cursor-pointer hover:opacity-90 transition-opacity"
                 onClick={() => window.open(fullMediaUrl, '_blank')}
              />
            ) : (
              <div className="bg-slate-200 dark:bg-slate-800 h-40 w-full rounded-md flex flex-col items-center justify-center text-slate-500 gap-2 border-2 border-dashed border-slate-300 dark:border-slate-700">
                 <ImageIcon className="h-8 w-8 opacity-50" />
-                <span className="text-[10px] opacity-70">{t('imageNoPreview')}</span> {/* 👈 ترجمه */}
+                <span className="text-[10px] opacity-70">{t('imageNoPreview')}</span>
              </div>
            )}
            {msg.text && msg.text !== '[Image]' && (
@@ -265,9 +274,8 @@ export default function ChatPage() {
                     <FileText className="h-5 w-5 text-orange-600 dark:text-orange-300" />
                 </div>
                 <div className="flex-1 overflow-hidden">
-                    {/* 👈 ترجمه */}
                     <p className="text-sm font-medium truncate dir-ltr">{msg.text.replace('[Document]', t('attachment'))}</p>
-                    <span className="text-[10px] opacity-70">{t('docLabel')}</span> {/* 👈 ترجمه */}
+                    <span className="text-[10px] opacity-70">{t('docLabel')}</span>
                 </div>
                 {fullMediaUrl && (
                     <a href={fullMediaUrl} target="_blank" rel="noopener noreferrer" className="p-2 hover:bg-black/10 rounded-full transition-colors">
@@ -284,6 +292,32 @@ export default function ChatPage() {
 
   const selectedChatInfo = conversations.find(c => c.id === selectedChatId);
 
+  // 🔴 رندر شرطی برای حالت عدم دسترسی
+  if (permissionDenied) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[calc(100vh-7rem)] text-center space-y-4 animate-in fade-in bg-white dark:bg-slate-950 rounded-xl border border-red-100 dark:border-red-900/30">
+        <div className="bg-red-50 dark:bg-red-900/20 p-6 rounded-full">
+           <ShieldAlert className="h-16 w-16 text-red-500" />
+        </div>
+        <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100">عدم دسترسی</h2>
+        <p className="text-slate-500 dark:text-slate-400 max-w-md px-4">
+          شما مجوز مشاهده صندوق پیام‌های تیم (Team Inbox) را ندارید. 
+          <br />
+          لطفاً جهت دریافت دسترسی با مدیر سیستم تماس بگیرید.
+        </p>
+      </div>
+    );
+  }
+
+  // حالت لودینگ اولیه
+  if (loading) {
+      return (
+          <div className="flex items-center justify-center h-[calc(100vh-7rem)] bg-white dark:bg-slate-950 rounded-xl">
+              <Loader2 className="h-10 w-10 animate-spin text-blue-600" />
+          </div>
+      );
+  }
+
   return (
     <div className="flex h-[calc(100vh-7rem)] w-full overflow-hidden bg-white dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm mt-2">
       
@@ -295,7 +329,7 @@ export default function ChatPage() {
         <div className="p-4 border-b border-slate-200 dark:border-slate-800 shrink-0 flex gap-2">
           <div className="relative flex-1">
             <Search className="absolute right-3 top-2.5 h-4 w-4 text-slate-400" />
-            <Input placeholder={t('search')} className="pr-9 bg-white dark:bg-slate-950" /> {/* 👈 ترجمه */}
+            <Input placeholder={t('search')} className="pr-9 bg-white dark:bg-slate-950" />
           </div>
           <Button variant="outline" size="icon" onClick={() => setIsNewChatOpen(true)} className="bg-white dark:bg-slate-950">
             <Plus className="h-4 w-4 text-blue-600" />
@@ -305,7 +339,7 @@ export default function ChatPage() {
         {isNewChatOpen && (
             <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border-b border-blue-100 animate-in slide-in-from-top-2">
                 <div className="flex justify-between items-center mb-2">
-                    <span className="text-xs font-bold text-blue-700">{t('phone')}:</span> {/* 👈 ترجمه */}
+                    <span className="text-xs font-bold text-blue-700">{t('phone')}:</span>
                     <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => setIsNewChatOpen(false)}>
                         <X className="h-3 w-3" />
                     </Button>
@@ -318,7 +352,7 @@ export default function ChatPage() {
                         className="bg-white h-8 text-sm dir-ltr"
                         autoFocus
                     />
-                    <Button size="sm" onClick={startNewChat} className="h-8 bg-blue-600 text-white">{t('start')}</Button> {/* 👈 ترجمه */}
+                    <Button size="sm" onClick={startNewChat} className="h-8 bg-blue-600 text-white">{t('start')}</Button>
                 </div>
             </div>
         )}
@@ -344,7 +378,6 @@ export default function ChatPage() {
                     </div>
                     <div className="flex items-center justify-between">
                       <p className="text-xs text-slate-500 truncate max-w-[140px] dir-rtl text-right">
-                          {/* 👈 ترجمه و آیکون */}
                           {chat.messages?.[0]?.type === 'image' ? `📷 ${t('image')}` : chat.messages?.[0]?.text || "..."}
                       </p>
                       {chat.unreadCount > 0 && (
@@ -396,7 +429,7 @@ export default function ChatPage() {
                  ) : messages.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-full text-slate-400 opacity-70">
                       <MessageSquare className="h-12 w-12 mb-2" />
-                      <p>{t('noMessages')}</p> {/* 👈 ترجمه */}
+                      <p>{t('noMessages')}</p>
                     </div>
                  ) : (
                    messages.map((msg) => (
@@ -421,7 +454,7 @@ export default function ChatPage() {
             <div className="p-3 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 shrink-0">
               <form onSubmit={handleSendMessage} className="flex items-center gap-2">
                 <Button type="button" variant="ghost" size="icon" className="text-slate-400"><Paperclip className="h-5 w-5" /></Button>
-                <Input value={inputText} onChange={(e) => setInputText(e.target.value)} placeholder={t('typeMessage')} className="flex-1 bg-slate-100 dark:bg-slate-800 border-0 focus-visible:ring-0" /> {/* 👈 ترجمه */}
+                <Input value={inputText} onChange={(e) => setInputText(e.target.value)} placeholder={t('typeMessage')} className="flex-1 bg-slate-100 dark:bg-slate-800 border-0 focus-visible:ring-0" />
                 <Button type="submit" disabled={!inputText.trim()} className="bg-blue-600 hover:bg-blue-700 text-white rounded-full h-10 w-10 p-0 shadow-sm">
                   <Send className={cn("h-4 w-4 rotate-180", !inputText.trim() ? "opacity-50" : "")} />
                 </Button>
@@ -431,7 +464,7 @@ export default function ChatPage() {
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center text-slate-400 bg-slate-50/30">
              <div className="w-24 h-24 bg-slate-100 dark:bg-slate-900 rounded-full flex items-center justify-center mb-4"><MessageSquare className="h-10 w-10 text-slate-300" /></div>
-             <p>{t('startChat')}</p> {/* 👈 ترجمه */}
+             <p>{t('startChat')}</p>
           </div>
         )}
       </div>

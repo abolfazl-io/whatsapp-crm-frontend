@@ -1,8 +1,7 @@
 "use client";
 
 import { useState } from "react";
-// import { api } from "@/lib/api"; // در اینجا چون FormData داریم، از fetch مستقیم استفاده می‌کنیم که راحت‌تر است
-import { useTranslations } from "next-intl"; // 👈 هوک ترجمه
+import { useTranslations } from "next-intl"; 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -11,7 +10,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Send, Phone, Image as ImageIcon, Loader2, CheckCircle2, AlertCircle, UploadCloud } from "lucide-react";
 
 export default function SendImagePage() {
-  const t = useTranslations('SendImage'); // 👈 دسترسی به کلیدهای SendImage
+  const t = useTranslations('SendImage'); 
   const tCommon = useTranslations('Common');
 
   const [phone, setPhone] = useState("");
@@ -28,7 +27,7 @@ export default function SendImagePage() {
         setStatus({ type: 'error', msg: t('errorType') });
         return;
       }
-      if (selectedFile.size > 5 * 1024 * 1024) {
+      if (selectedFile.size > 5 * 1024 * 1024) { // محدودیت ۵ مگابایت
         setStatus({ type: 'error', msg: t('errorSize') });
         return;
       }
@@ -59,8 +58,6 @@ export default function SendImagePage() {
       if (caption) formData.append("caption", caption);
 
       const token = localStorage.getItem("token");
-
-      // استفاده از آدرس کامل (یا متغیر محیطی)
       const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
       
       const response = await fetch(`${baseUrl}/whatsapp/upload-image`, {
@@ -73,19 +70,34 @@ export default function SendImagePage() {
       });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        console.error("Server Error Details:", errorData);
-        throw new Error(errorData.message || `Error: ${response.status}`);
+        // 🛑 مدیریت خطای عدم دسترسی (۴۰۳)
+        if (response.status === 403) {
+            throw new Error("⛔ شما مجوز ارسال تصویر را ندارید.");
+        }
+
+        // 🛑 خواندن ایمن متن خطا (جلوگیری از ارور {})
+        const errorText = await response.text();
+        try {
+            const errorJson = JSON.parse(errorText);
+            throw new Error(errorJson.message || `Error: ${response.status}`);
+        } catch (e) {
+            // اگر جیسون نبود، لاگ کردن متن خام و نمایش خطای عمومی
+            console.warn("Raw Server Error:", errorText);
+            throw new Error(`خطای سرور (${response.status})`);
+        }
       }
 
       setStatus({ type: 'success', msg: t('success') });
       
+      // پاکسازی فرم
       setFile(null);
       setPreview(null);
       setCaption("");
 
     } catch (error: any) {
-      console.error("Upload Error:", error);
+      // ✅ تغییر console.error به console.warn برای جلوگیری از قرمز شدن کنسول در خطاهای عادی
+      console.warn("Upload Failed:", error.message);
+      
       const errorMsg = error.message || tCommon('error');
       setStatus({ type: 'error', msg: errorMsg });
     } finally {
