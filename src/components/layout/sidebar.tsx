@@ -166,12 +166,12 @@ export function Sidebar() {
             icon: Contact, 
             roles: ['ADMIN', 'AGENT'] 
           },
-          { 
-            name: t('crmCanned'), 
-            href: `/${currentLocale}/dashboard/crm/canned-responses`, 
-            icon: Zap, 
-            roles: ['ADMIN', 'AGENT'] 
-          },
+          // { 
+          //   name: t('crmCanned'), 
+          //   href: `/${currentLocale}/dashboard/crm/canned-responses`, 
+          //   icon: Zap, 
+          //   roles: ['ADMIN', 'AGENT'] 
+          // },
 
         ]
     },

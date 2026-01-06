@@ -193,7 +193,9 @@
     "testSuccess": "✅ Test scenario \"{type}\" was successful.",
     "testError": "❌ Test failed: {error}",
     "deleteConfirm": "Are you sure? Messages will no longer be forwarded to your server.",
-    "errorInput": "Please enter a destination URL."
+    "errorInput": "Please enter a destination URL.",
+    "textMsgPlaceholder": "Enter custom test message (optional)...",
+    "imageCaptionPlaceholder": "Enter image caption (optional)..."
   },
   "Keywords": {
     "title": "Smart Auto-Reply",

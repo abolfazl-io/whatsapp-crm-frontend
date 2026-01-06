@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { api } from "@/lib/api"; // 👈 استفاده از api مرکزی
-import { useTranslations } from "next-intl"; // 👈 هوک ترجمه
+import { api } from "@/lib/api";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -11,17 +11,20 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { 
   Webhook, Globe, Save, Loader2, CheckCircle2, AlertCircle, 
-  Trash2, Activity, Zap, MessageSquare, Image as ImageIcon, CheckCheck
+  Trash2, Activity, Zap, MessageSquare, Image as ImageIcon, CheckCheck, PenLine
 } from "lucide-react";
 
 export default function WebhookPage() {
-  const t = useTranslations('Webhook'); // 👈 دسترسی به کلیدهای Webhook
+  const t = useTranslations('Webhook');
   const tCommon = useTranslations('Common');
 
   const [url, setUrl] = useState("");
   const [savedUrl, setSavedUrl] = useState("");
   const [testType, setTestType] = useState<'text' | 'image' | 'status'>('text');
   
+  // 👇 1. اضافه کردن state برای متن تست
+  const [testBody, setTestBody] = useState("");
+
   const [loading, setLoading] = useState(false);
   const [testLoading, setTestLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
@@ -31,7 +34,6 @@ export default function WebhookPage() {
     fetchWebhook();
   }, []);
 
-  // دریافت اطلاعات (با api مرکزی)
   const fetchWebhook = async () => {
     try {
       const res = await api.get("/whatsapp/webhook");
@@ -46,7 +48,6 @@ export default function WebhookPage() {
     }
   };
 
-  // ذخیره (با api مرکزی)
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!url) return;
@@ -65,7 +66,6 @@ export default function WebhookPage() {
     }
   };
 
-  // حذف (با api مرکزی)
   const handleDelete = async () => {
     if (!confirm(t('deleteConfirm'))) return;
     
@@ -83,7 +83,7 @@ export default function WebhookPage() {
     }
   };
 
-  // تست (با api مرکزی)
+  // 👇 2. آپدیت تابع تست برای ارسال متن
   const handleTest = async () => {
     if (!url) {
         setStatus({ type: 'error', msg: t('errorInput') });
@@ -96,7 +96,8 @@ export default function WebhookPage() {
     try {
       await api.post("/whatsapp/webhook/test", { 
         url: url, 
-        type: testType 
+        type: testType,
+        text: testBody // 👈 ارسال متن دلخواه به بک‌اند
       });
 
       setStatus({ type: 'success', msg: t('testSuccess', { type: testType }) });
@@ -116,7 +117,6 @@ export default function WebhookPage() {
   return (
     <div className="max-w-3xl mx-auto space-y-6 animate-in fade-in duration-500 py-6">
       
-      {/* هدر صفحه */}
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">{t('title')}</h2>
@@ -148,7 +148,6 @@ export default function WebhookPage() {
           
           <CardContent className="space-y-6">
             
-            {/* نمایش پیغام‌های وضعیت */}
             {status && (
               <Alert variant={status.type === 'error' ? "destructive" : "default"} 
                      className={`transition-all duration-300 ${
@@ -164,7 +163,6 @@ export default function WebhookPage() {
               </Alert>
             )}
 
-            {/* ورودی آدرس وب‌هوک */}
             <div className="space-y-2">
               <Label htmlFor="url" className="flex items-center gap-2">
                 <Globe className="h-4 w-4 text-slate-500" />
@@ -182,60 +180,69 @@ export default function WebhookPage() {
               </p>
             </div>
 
-            {/* بخش ابزارهای تست و حذف */}
+            {/* بخش ابزارهای تست */}
             <div className="bg-slate-50 dark:bg-slate-900/50 rounded-lg border border-slate-100 dark:border-slate-800 p-4">
-                <div className="mb-3 text-sm text-slate-700 dark:text-slate-300 font-medium">
+                <div className="mb-3 text-sm text-slate-700 dark:text-slate-300 font-medium flex items-center gap-2">
+                    <PenLine className="h-4 w-4" />
                     {t('toolsTitle')}
                 </div>
                 
-                <div className="flex flex-col sm:flex-row gap-3 justify-between items-start sm:items-center">
-                    
-                    {/* انتخابگر سناریو و دکمه تست */}
-                    <div className="flex w-full sm:w-auto gap-2">
-                        <div className="relative">
-                            <select 
-                                value={testType}
-                                onChange={(e) => setTestType(e.target.value as any)}
-                                className="h-10 w-full sm:w-40 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-orange-500 dark:bg-slate-950 dark:border-slate-800 appearance-none cursor-pointer"
-                            >
-                                <option value="text">{t('testText')}</option>
-                                <option value="image">{t('testImage')}</option>
-                                <option value="status">{t('testStatus')}</option>
-                            </select>
-                            <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center px-2 text-slate-500">
-                                <svg className="h-4 w-4 fill-current" viewBox="0 0 20 20"><path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" /></svg>
+                <div className="space-y-3">
+                    {/* 👇 3. ورودی متن تست (فقط اگر نوع Status نباشد نمایش داده می‌شود) */}
+                    {testType !== 'status' && (
+                        <div>
+                            <Input 
+                                placeholder={testType === 'image' ? t('imageCaptionPlaceholder') : t('textMsgPlaceholder')}
+                                value={testBody}
+                                onChange={(e) => setTestBody(e.target.value)}
+                                className="bg-white dark:bg-slate-950 border-slate-200"
+                            />
+                        </div>
+                    )}
+
+                    <div className="flex flex-col sm:flex-row gap-3 justify-between items-start sm:items-center">
+                        <div className="flex w-full sm:w-auto gap-2">
+                            <div className="relative">
+                                <select 
+                                    value={testType}
+                                    onChange={(e) => setTestType(e.target.value as any)}
+                                    className="h-10 w-full sm:w-40 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-orange-500 dark:bg-slate-950 dark:border-slate-800 appearance-none cursor-pointer"
+                                >
+                                    <option value="text">{t('testText')}</option>
+                                    <option value="image">{t('testImage')}</option>
+                                    <option value="status">{t('testStatus')}</option>
+                                </select>
                             </div>
+
+                            <Button 
+                              type="button" 
+                              variant="secondary" 
+                              onClick={handleTest}
+                              disabled={testLoading || !url}
+                              className="flex-1 sm:flex-none border-slate-200 hover:bg-white"
+                            >
+                              {testLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : (
+                                  testType === 'text' ? <MessageSquare className="h-4 w-4 mr-2 text-blue-500"/> :
+                                  testType === 'image' ? <ImageIcon className="h-4 w-4 mr-2 text-purple-500"/> :
+                                  <CheckCheck className="h-4 w-4 mr-2 text-green-500"/>
+                              )}
+                              {t('sendTest')}
+                            </Button>
                         </div>
 
-                        <Button 
-                          type="button" 
-                          variant="secondary" 
-                          onClick={handleTest}
-                          disabled={testLoading || !url}
-                          className="flex-1 sm:flex-none border-slate-200 hover:bg-white"
-                        >
-                          {testLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : (
-                              testType === 'text' ? <MessageSquare className="h-4 w-4 mr-2 text-blue-500"/> :
-                              testType === 'image' ? <ImageIcon className="h-4 w-4 mr-2 text-purple-500"/> :
-                              <CheckCheck className="h-4 w-4 mr-2 text-green-500"/>
-                          )}
-                          {t('sendTest')}
-                        </Button>
+                        {savedUrl && (
+                            <Button 
+                              type="button" 
+                              variant="ghost" 
+                              onClick={handleDelete}
+                              disabled={loading}
+                              className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                            >
+                              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4 mr-2" />}
+                              {t('deleteBtn')}
+                            </Button>
+                        )}
                     </div>
-
-                    {/* دکمه حذف */}
-                    {savedUrl && (
-                        <Button 
-                          type="button" 
-                          variant="ghost" 
-                          onClick={handleDelete}
-                          disabled={loading}
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                        >
-                          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4 mr-2" />}
-                          {t('deleteBtn')}
-                        </Button>
-                    )}
                 </div>
             </div>
 
