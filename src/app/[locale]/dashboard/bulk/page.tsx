@@ -2,23 +2,25 @@
 
 import { useState } from "react";
 import { api } from "@/lib/api";
+import { useTranslations } from "next-intl"; // 👈 اضافه شده
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Loader2, Send, Users, Image as ImageIcon, AlertTriangle, CheckCircle2, Info } from "lucide-react";
-import { useToast } from "@/components/ui/use-toast"; // اگر کامپوننت toast دارید، وگرنه حذف کنید
+import { Loader2, Send, Users, Image as ImageIcon, AlertTriangle, CheckCircle2 } from "lucide-react";
 
 export default function BulkPage() {
+  const t = useTranslations('Bulk'); // 👈 دسترسی به ترجمه‌های بخش Bulk
+  const tCommon = useTranslations('Common'); // 👈 دسترسی به ترجمه‌های عمومی
+
   const [phones, setPhones] = useState("");
   const [message, setMessage] = useState("");
   const [mediaUrl, setMediaUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<{ success: boolean; msg: string } | null>(null);
 
-  // محاسبه تعداد شماره‌های وارد شده
   const phoneList = phones.split("\n").filter((p) => p.trim().length > 0);
   const count = phoneList.length;
 
@@ -29,7 +31,6 @@ export default function BulkPage() {
     setResult(null);
 
     try {
-      // نرمال‌سازی شماره‌ها (حذف فضاهای خالی)
       const cleanPhones = phoneList.map(p => p.trim());
 
       const res = await api.post("/whatsapp/send-bulk", {
@@ -40,18 +41,15 @@ export default function BulkPage() {
 
       setResult({ 
         success: true, 
-        msg: `✅ کمپین با موفقیت در صف قرار گرفت! شناسه صف: ${res.data.queueDetails?.jobId || 'N/A'}` 
+        // استفاده از ترجمه با پارامتر
+        msg: t('successMsg', { id: res.data.queueDetails?.jobId || 'N/A' })
       });
       
-      // پاک کردن فرم در صورت موفقیت
-      // setPhones("");
-      // setMessage("");
-
     } catch (error: any) {
       console.error(error);
       setResult({ 
         success: false, 
-        msg: error.response?.data?.message || "❌ خطا در ارسال درخواست." 
+        msg: error.response?.data?.message || tCommon('error')
       });
     } finally {
       setLoading(false);
@@ -62,8 +60,8 @@ export default function BulkPage() {
     <div className="space-y-6 animate-in fade-in duration-500">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">ارسال انبوه هوشمند</h2>
-          <p className="text-muted-foreground mt-1">ارسال پیام گروهی با رعایت قوانین ضد اسپم واتساپ</p>
+          <h2 className="text-3xl font-bold tracking-tight">{t('title')}</h2>
+          <p className="text-muted-foreground mt-1">{t('description')}</p>
         </div>
       </div>
 
@@ -75,23 +73,23 @@ export default function BulkPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Users className="h-5 w-5 text-blue-600" />
-                لیست گیرندگان
+                {t('recipients')}
               </CardTitle>
               <CardDescription>
-                شماره‌های موبایل را وارد کنید (هر شماره در یک خط). فرمت‌های 0912 یا 98912 هر دو قبول می‌شوند.
+                {t('recipientsDesc')}
               </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="relative">
                 <Textarea 
-                  placeholder="09121111111&#10;09352222222&#10;09193333333" 
-                  className="min-h-[200px] font-mono text-base resize-y"
+                  placeholder={t('recipientsPlaceholder')}
+                  className="min-h-[200px] font-mono text-base resize-y dir-ltr text-left" // dir-ltr برای نمایش صحیح شماره‌ها
                   value={phones}
                   onChange={(e) => setPhones(e.target.value)}
                 />
-                <div className="absolute bottom-2 left-2">
+                <div className="absolute bottom-2 right-2">
                   <Badge variant={count > 0 ? "secondary" : "outline"}>
-                    {count} گیرنده
+                    {count} {t('recipientCount')}
                   </Badge>
                 </div>
               </div>
@@ -102,14 +100,14 @@ export default function BulkPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Send className="h-5 w-5 text-green-600" />
-                محتوای پیام
+                {t('messageContent')}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <label className="text-sm font-medium">متن پیام</label>
+                <label className="text-sm font-medium">{t('messageLabel')}</label>
                 <Textarea 
-                  placeholder="سلام، جشنواره فروش ویژه ما شروع شد..." 
+                  placeholder="Hello..." 
                   className="min-h-[120px]"
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
@@ -119,7 +117,7 @@ export default function BulkPage() {
               <div className="space-y-2">
                 <label className="text-sm font-medium flex items-center gap-2">
                   <ImageIcon className="h-4 w-4" /> 
-                  لینک تصویر (اختیاری)
+                  {t('imageLabel')}
                 </label>
                 <Input 
                   placeholder="https://example.com/image.jpg" 
@@ -127,12 +125,12 @@ export default function BulkPage() {
                   onChange={(e) => setMediaUrl(e.target.value)}
                   dir="ltr"
                 />
-                <p className="text-xs text-muted-foreground">لینک مستقیم تصویر را وارد کنید.</p>
+                <p className="text-xs text-muted-foreground">{t('imageHelp')}</p>
               </div>
             </CardContent>
             <CardFooter className="bg-slate-50 dark:bg-slate-900/50 flex justify-between items-center py-4 border-t">
                <span className="text-xs text-slate-500">
-                 {loading ? "در حال پردازش..." : "آماده ارسال"}
+                 {loading ? t('processing') : t('ready')}
                </span>
                <Button 
                  onClick={handleSend} 
@@ -140,7 +138,7 @@ export default function BulkPage() {
                  className="bg-blue-600 hover:bg-blue-700 min-w-[140px]"
                >
                  {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
-                 شروع ارسال
+                 {t('startSending')}
                </Button>
             </CardFooter>
           </Card>
@@ -153,7 +151,7 @@ export default function BulkPage() {
           {result && (
             <Alert variant={result.success ? "default" : "destructive"} className={result.success ? "border-green-200 bg-green-50 text-green-800" : ""}>
               {result.success ? <CheckCircle2 className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
-              <AlertTitle>{result.success ? "موفق" : "خطا"}</AlertTitle>
+              <AlertTitle>{result.success ? tCommon('success') : tCommon('error')}</AlertTitle>
               <AlertDescription>{result.msg}</AlertDescription>
             </Alert>
           )}
@@ -161,7 +159,7 @@ export default function BulkPage() {
           {/* پیش‌نمایش */}
           <Card className="bg-slate-100 dark:bg-slate-950 border-dashed">
              <CardHeader className="pb-2">
-               <CardTitle className="text-sm font-medium text-slate-500 uppercase">پیش‌نمایش</CardTitle>
+               <CardTitle className="text-sm font-medium text-slate-500 uppercase">{t('preview')}</CardTitle>
              </CardHeader>
              <CardContent>
                 <div className="bg-[#DCF8C6] dark:bg-[#056162] text-slate-900 dark:text-white p-3 rounded-lg rounded-tl-none shadow-sm max-w-full text-sm leading-relaxed whitespace-pre-wrap relative">
@@ -170,7 +168,7 @@ export default function BulkPage() {
                          <img src={mediaUrl} alt="Preview" className="w-full h-full object-cover" onError={(e) => (e.currentTarget.style.display = 'none')} />
                       </div>
                     )}
-                    {message || <span className="text-slate-400 italic">متن پیام اینجا نمایش داده می‌شود...</span>}
+                    {message || <span className="text-slate-400 italic">{t('previewText')}</span>}
                     <div className="text-[10px] text-right mt-1 opacity-60 flex justify-end gap-1">
                        12:30 <span className="text-blue-500">✓✓</span>
                     </div>
@@ -183,13 +181,13 @@ export default function BulkPage() {
             <CardHeader className="pb-2">
               <CardTitle className="flex items-center gap-2 text-yellow-700 dark:text-yellow-500 text-sm">
                 <AlertTriangle className="h-4 w-4" />
-                نکات ضد مسدودی
+                {t('tipsTitle')}
               </CardTitle>
             </CardHeader>
             <CardContent className="text-xs text-yellow-800 dark:text-yellow-200 space-y-2 leading-relaxed">
-              <p>• سیستم پیام‌ها را با فاصله زمانی (Delay) ارسال می‌کند تا شماره شما مسدود نشود.</p>
-              <p>• از ارسال پیام‌های تکراری و مزاحم به افرادی که شما را نمی‌شناسند خودداری کنید.</p>
-              <p>• اگر تعداد گیرندگان زیاد است (بالای ۱۰۰ نفر)، ارسال ممکن است چند دقیقه طول بکشد.</p>
+              <p>• {t('tips1')}</p>
+              <p>• {t('tips2')}</p>
+              <p>• {t('tips3')}</p>
             </CardContent>
           </Card>
 

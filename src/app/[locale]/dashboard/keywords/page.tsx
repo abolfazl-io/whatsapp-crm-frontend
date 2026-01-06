@@ -1,20 +1,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { api } from "@/lib/api"; // 👈 استفاده از api مرکزی
+import { useTranslations } from "next-intl"; // 👈 هوک ترجمه
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-// نکته: کامپوننت‌های Shadcn که نصب نداشتید حذف و با HTML جایگزین شدند
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { 
-  Bot, 
-  Plus, 
-  Trash2, 
-  Loader2, 
-  MessageSquare, 
-  Zap,
-  SearchX
-} from "lucide-react";
+import { Bot, Plus, Trash2, Loader2, MessageSquare, Zap, SearchX } from "lucide-react";
 
 interface Keyword {
   id: string;
@@ -23,6 +16,8 @@ interface Keyword {
 }
 
 export default function KeywordsPage() {
+  const t = useTranslations('Keywords'); // 👈 دسترسی به کلیدهای ترجمه
+
   const [keywords, setKeywords] = useState<Keyword[]>([]);
   const [newTrigger, setNewTrigger] = useState("");
   const [newResponse, setNewResponse] = useState("");
@@ -30,28 +25,11 @@ export default function KeywordsPage() {
   const [fetching, setFetching] = useState(true);
   const [status, setStatus] = useState<{ type: 'success' | 'error', msg: string } | null>(null);
 
-  // هدر احراز هویت
-  const getHeaders = () => {
-    const token = localStorage.getItem("token");
-    return {
-        "Content-Type": "application/json",
-        ...(token ? { "Authorization": `Bearer ${token}` } : {})
-    };
-  };
-
-  // ✅ 1. استفاده از GET برای دریافت لیست کلمات
-  useEffect(() => {
-    fetchKeywords();
-  }, []);
-
+  // ✅ 1. دریافت لیست (با api مرکزی)
   const fetchKeywords = async () => {
     try {
-      const res = await fetch("http://localhost:3000/whatsapp/keywords", { headers: getHeaders() });
-      if (res.ok) {
-        const data = await res.json();
-        // اطمینان از اینکه دیتا آرایه است
-        setKeywords(Array.isArray(data) ? data : []);
-      }
+      const res = await api.get("/whatsapp/keywords");
+      setKeywords(Array.isArray(res.data) ? res.data : []);
     } catch (error) {
       console.error("Error fetching keywords", error);
     } finally {
@@ -59,11 +37,15 @@ export default function KeywordsPage() {
     }
   };
 
-  // ✅ 2. استفاده از POST برای افزودن
+  useEffect(() => {
+    fetchKeywords();
+  }, []);
+
+  // ✅ 2. افزودن (با api مرکزی)
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTrigger || !newResponse) {
-        setStatus({ type: 'error', msg: 'لطفاً کلمه کلیدی و پاسخ را وارد کنید.' });
+        setStatus({ type: 'error', msg: t('alertErrorInput') });
         return;
     }
     
@@ -71,39 +53,29 @@ export default function KeywordsPage() {
     setStatus(null);
 
     try {
-      const res = await fetch("http://localhost:3000/whatsapp/keywords", {
-        method: "POST",
-        headers: getHeaders(),
-        body: JSON.stringify({ 
-            trigger: newTrigger, 
-            response: newResponse 
-        })
+      await api.post("/whatsapp/keywords", { 
+          trigger: newTrigger, 
+          response: newResponse 
       });
 
-      if (!res.ok) throw new Error("خطا در ذخیره سازی");
-
-      setStatus({ type: 'success', msg: 'پاسخ خودکار با موفقیت اضافه شد.' });
+      setStatus({ type: 'success', msg: t('alertSuccess') });
       setNewTrigger("");
       setNewResponse("");
-      fetchKeywords(); // لیست را رفرش کن
+      fetchKeywords(); // رفرش لیست
 
     } catch (error) {
-      setStatus({ type: 'error', msg: 'خطا در ارتباط با سرور.' });
+      setStatus({ type: 'error', msg: t('alertErrorServer') });
     } finally {
       setLoading(false);
     }
   };
 
-  // ✅ 3. استفاده از DELETE برای حذف
+  // ✅ 3. حذف (با api مرکزی)
   const handleDelete = async (id: string) => {
-    if(!confirm("آیا از حذف این مورد اطمینان دارید؟")) return;
+    if(!confirm(t('deleteConfirm'))) return;
 
     try {
-      await fetch(`http://localhost:3000/whatsapp/keywords/${id}`, {
-        method: "DELETE",
-        headers: getHeaders()
-      });
-      // حذف آیتم از لیست بدون رفرش صفحه
+      await api.delete(`/whatsapp/keywords/${id}`);
       setKeywords(prev => prev.filter(k => k.id !== id));
     } catch (error) {
       console.error("Delete error", error);
@@ -116,12 +88,16 @@ export default function KeywordsPage() {
       {/* هدر صفحه */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">پاسخ‌دهی هوشمند</h2>
-          <p className="text-muted-foreground mt-1">تعریف کلمات کلیدی برای ارسال پاسخ خودکار.</p>
+          <h2 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
+            {t('title')}
+          </h2>
+          <p className="text-muted-foreground mt-1">
+            {t('description')}
+          </p>
         </div>
         <div className="bg-blue-50 text-blue-700 px-4 py-2 rounded-full text-sm font-medium flex items-center gap-2">
             <Bot className="h-4 w-4" />
-            {keywords.length} قانون فعال
+            {t('activeRules', { count: keywords.length })}
         </div>
       </div>
 
@@ -132,10 +108,10 @@ export default function KeywordsPage() {
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
                 <Plus className="h-5 w-5 text-orange-600" />
-                قانون جدید
+                {t('addRule')}
             </CardTitle>
             <CardDescription>
-              کلمه و پاسخی که ربات باید بدهد را وارد کنید.
+              {t('newRuleDesc')}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -143,17 +119,17 @@ export default function KeywordsPage() {
                 
                 {status && (
                     <Alert variant={status.type === 'error' ? "destructive" : "default"} className={status.type === 'success' ? "bg-green-50 text-green-700 border-green-200 text-xs p-3" : "text-xs p-3"}>
-                        <AlertTitle>{status.type === 'success' ? "ثبت شد" : "خطا"}</AlertTitle>
+                        <AlertTitle>{status.type === 'success' ? t('registered') : t('errorTitle')}</AlertTitle>
                         <AlertDescription>{status.msg}</AlertDescription>
                     </Alert>
                 )}
 
                 <div className="space-y-2">
-                    <label className="text-sm font-medium">کلمه کلیدی (Trigger)</label>
+                    <label className="text-sm font-medium">{t('trigger')}</label>
                     <div className="relative">
                         <Zap className="absolute right-3 top-2.5 h-4 w-4 text-slate-400" />
                         <Input 
-                            placeholder="مثال: قیمت" 
+                            placeholder={t('triggerPlaceholder')}
                             className="pr-9"
                             value={newTrigger}
                             onChange={(e) => setNewTrigger(e.target.value)}
@@ -162,10 +138,9 @@ export default function KeywordsPage() {
                 </div>
 
                 <div className="space-y-2">
-                    <label className="text-sm font-medium">پاسخ ربات</label>
-                    {/* استفاده از Textarea معمولی HTML */}
+                    <label className="text-sm font-medium">{t('response')}</label>
                     <textarea 
-                        placeholder="متن پیام پاسخ..." 
+                        placeholder={t('responsePlaceholder')}
                         className="flex min-h-[100px] w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm ring-offset-white placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-950 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-800 dark:bg-slate-950 dark:ring-offset-slate-950 dark:placeholder:text-slate-400 dark:focus-visible:ring-slate-300"
                         value={newResponse}
                         onChange={(e) => setNewResponse(e.target.value)}
@@ -173,18 +148,18 @@ export default function KeywordsPage() {
                 </div>
 
                 <Button type="submit" className="w-full bg-slate-900 hover:bg-slate-800" disabled={loading}>
-                    {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "افزودن به لیست"}
+                    {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : t('addButton')}
                 </Button>
             </form>
           </CardContent>
         </Card>
 
-        {/* بخش نمایش لیست (GET) */}
+        {/* بخش نمایش لیست */}
         <Card className="shadow-sm border-slate-200 dark:border-slate-800">
             <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-2">
                     <MessageSquare className="h-5 w-5 text-blue-600" />
-                    لیست پاسخ‌های خودکار
+                    {t('list')}
                 </CardTitle>
             </CardHeader>
             <CardContent>
@@ -193,16 +168,15 @@ export default function KeywordsPage() {
                 ) : keywords.length === 0 ? (
                     <div className="text-center py-10 text-slate-500">
                         <SearchX className="h-10 w-10 mx-auto mb-2 opacity-50" />
-                        <p>هیچ کلمه کلیدی تعریف نشده است.</p>
+                        <p>{t('noKeywords')}</p>
                     </div>
                 ) : (
-                    // جدول HTML جایگزین کامپوننت Table
                     <div className="relative w-full overflow-auto">
                         <table className="w-full caption-bottom text-sm text-right">
                             <thead className="[&_tr]:border-b">
                                 <tr className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted">
-                                    <th className="h-12 px-4 align-middle font-medium text-muted-foreground w-[150px]">کلمه کلیدی</th>
-                                    <th className="h-12 px-4 align-middle font-medium text-muted-foreground">پاسخ ربات</th>
+                                    <th className="h-12 px-4 align-middle font-medium text-muted-foreground w-[150px]">{t('trigger')}</th>
+                                    <th className="h-12 px-4 align-middle font-medium text-muted-foreground">{t('response')}</th>
                                     <th className="h-12 px-4 align-middle font-medium text-muted-foreground w-[50px]"></th>
                                 </tr>
                             </thead>
@@ -210,7 +184,6 @@ export default function KeywordsPage() {
                                 {keywords.map((k) => (
                                     <tr key={k.id} className="border-b transition-colors hover:bg-slate-50/50">
                                         <td className="p-4 align-middle font-medium">
-                                            {/* بجای Badge */}
                                             <span className="inline-flex items-center rounded-full border border-orange-200 bg-orange-50 px-2.5 py-0.5 text-xs font-semibold text-orange-700">
                                                 {k.trigger}
                                             </span>

@@ -7,15 +7,20 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { MessageSquareCode, Send, Loader2, RefreshCw, Smartphone, ShieldCheck } from "lucide-react";
+import { useTranslations } from "next-intl"; 
 
 export default function OtpSendPage() {
+  // 1. فراخوانی هوک‌های ترجمه
+  const t = useTranslations('Otp');
+  const tCommon = useTranslations('Common');
+  
   const [phone, setPhone] = useState("");
   const [code, setCode] = useState("");
   const [brand, setBrand] = useState("");
   const [loading, setLoading] = useState(false);
-  const [timer, setTimer] = useState(0); // برای محدودیت ارسال (Rate Limit)
+  const [timer, setTimer] = useState(0); 
 
-  // مدیریت تایمر معکوس
+  // مدیریت تایمر
   useEffect(() => {
     let interval: NodeJS.Timeout;
     if (timer > 0) {
@@ -26,13 +31,11 @@ export default function OtpSendPage() {
     return () => clearInterval(interval);
   }, [timer]);
 
-  // تولید کد تصادفی
   const generateRandomCode = () => {
     const random = Math.floor(10000 + Math.random() * 90000).toString();
     setCode(random);
   };
 
-  // اعتبارسنجی شماره موبایل
   const validatePhone = (p: string) => {
     const regex = /^09\d{9}$/;
     return regex.test(p);
@@ -41,13 +44,14 @@ export default function OtpSendPage() {
   const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (timer > 0) return; // اگر تایمر فعال است، اجازه نده
+    if (timer > 0) return; 
     if (!phone || !code) {
-      alert("لطفاً شماره و کد را وارد کنید.");
+      alert(tCommon('error')); // یا متن اختصاصی برای خطا
       return;
     }
+    // چک کردن فرمت فقط برای شماره‌های ایران منطقی است، اگر پروژه بین‌المللی است شاید بخواهید این را بردارید
     if (!validatePhone(phone)) {
-      alert("شماره موبایل نامعتبر است (باید ۱۱ رقم و با ۰۹ شروع شود).");
+      alert("Invalid Phone Number"); // می‌توانید این را هم به ترجمه‌ها اضافه کنید
       return;
     }
 
@@ -57,14 +61,14 @@ export default function OtpSendPage() {
         sessionId: "session_1",
         phone: phone,
         code: code,
-        brand: brand || "تیم اینباکس"
+        brand: brand || "TeamInbox"
       });
 
-      alert("✅ کد با موفقیت ارسال شد!");
-      setTimer(60); // فعال کردن تایمر ۶۰ ثانیه‌ای
+      alert(tCommon('success')); // ✅ استفاده از ترجمه موفقیت
+      setTimer(60); 
     } catch (error: any) {
       console.error(error);
-      alert("❌ خطا در ارسال. ربات متصل نیست یا مشکلی پیش آمده.");
+      alert(tCommon('error')); // ❌ استفاده از ترجمه خطا
     } finally {
       setLoading(false);
     }
@@ -76,10 +80,10 @@ export default function OtpSendPage() {
       <div className="flex flex-col gap-2">
         <h1 className="text-3xl font-bold text-slate-900 dark:text-white flex items-center gap-3">
           <ShieldCheck className="h-8 w-8 text-green-600" />
-          سرویس رمز یکبار مصرف (OTP)
+          {t('title')} {/* 👈 تیتر ترجمه شده */}
         </h1>
         <p className="text-slate-500">
-          ارسال کد احراز هویت از طریق واتساپ (امن، سریع و رایگان)
+          {t('description')} {/* 👈 توضیحات ترجمه شده */}
         </p>
       </div>
 
@@ -88,14 +92,14 @@ export default function OtpSendPage() {
         {/* فرم ارسال */}
         <Card className="border-t-4 border-t-green-600 shadow-sm">
           <CardHeader>
-            <CardTitle>ارسال دستی کد</CardTitle>
-            <CardDescription>تست عملکرد API و ارسال تکی</CardDescription>
+            <CardTitle>{t('manualSend')}</CardTitle>
+            <CardDescription>{t('manualDesc')}</CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSendOtp} className="space-y-4">
               
               <div className="space-y-2">
-                <Label>شماره موبایل</Label>
+                <Label>{t('phoneLabel')}</Label>
                 <div className="relative">
                   <Smartphone className="absolute right-3 top-2.5 h-4 w-4 text-slate-400" />
                   <Input 
@@ -108,7 +112,7 @@ export default function OtpSendPage() {
               </div>
 
               <div className="space-y-2">
-                <Label>کد تایید</Label>
+                <Label>{t('codeLabel')}</Label>
                 <div className="flex gap-2">
                   <div className="relative flex-1">
                     <MessageSquareCode className="absolute right-3 top-2.5 h-4 w-4 text-slate-400" />
@@ -119,16 +123,16 @@ export default function OtpSendPage() {
                       onChange={(e) => setCode(e.target.value)}
                     />
                   </div>
-                  <Button type="button" variant="outline" onClick={generateRandomCode} title="تولید کد">
+                  <Button type="button" variant="outline" onClick={generateRandomCode} title={t('generate')}>
                     <RefreshCw className="h-4 w-4" />
                   </Button>
                 </div>
               </div>
 
               <div className="space-y-2">
-                <Label>نام برند (اختیاری)</Label>
+                <Label>{t('brandLabel')}</Label>
                 <Input 
-                  placeholder="مثال: فروشگاه من" 
+                  placeholder="My Shop" 
                   value={brand}
                   onChange={(e) => setBrand(e.target.value)}
                 />
@@ -142,10 +146,11 @@ export default function OtpSendPage() {
                 {loading ? (
                   <Loader2 className="animate-spin ml-2 h-4 w-4" />
                 ) : timer > 0 ? (
-                  `لطفاً ${timer} ثانیه صبر کنید`
+                  // استفاده از پارامتر در ترجمه (مثلاً: Please wait 30s)
+                  t('wait', {timer: timer}) 
                 ) : (
                   <>
-                    <Send className="ml-2 h-4 w-4" /> ارسال کد
+                    <Send className="ml-2 h-4 w-4" /> {t('sendBtn')}
                   </>
                 )}
               </Button>
@@ -158,11 +163,12 @@ export default function OtpSendPage() {
         <div className="space-y-6">
           <Card className="bg-slate-900 text-white border-none">
             <CardHeader>
-              <CardTitle className="text-lg text-green-400">مستندات توسعه‌دهندگان</CardTitle>
+              <CardTitle className="text-lg text-green-400">{t('docsTitle')}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4 text-sm font-mono dir-ltr text-left">
+              <p className="text-slate-400 font-sans">{t('docsDesc')}</p>
               <div>
-                <p className="text-slate-400 mb-1">// Endpoint</p>
+                <p className="text-slate-500 mb-1">// Endpoint</p>
                 <div className="bg-black/50 p-2 rounded border border-slate-700 text-blue-300 break-all">
                   POST /otp/send
                 </div>

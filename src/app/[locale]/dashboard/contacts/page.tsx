@@ -7,9 +7,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Search, User, Users, Loader2, MessageSquare, Tag } from "lucide-react"; // Users اضافه شد
+import { Search, User, Users, Loader2, MessageSquare, Tag } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useTranslations } from "next-intl"; // 👈 اضافه شده
 
 interface Contact {
   id: number;
@@ -22,6 +23,7 @@ interface Contact {
 }
 
 export default function ContactsPage() {
+  const t = useTranslations('Contacts'); // 👈 دسترسی به ترجمه‌های بخش مخاطبین
   const pathname = usePathname();
   const currentLocale = pathname.split('/')[1] || 'fa';
   
@@ -53,28 +55,28 @@ export default function ContactsPage() {
     return () => clearTimeout(delayDebounceFn);
   }, [search]);
 
-  // 🛠️ تابع تشخیص گروه: اگر شماره شامل "-" باشد یا خیلی طولانی باشد، احتمالاً گروه است
+  // تابع تشخیص گروه
   const isGroup = (phone: string) => {
     return phone.includes('-') || phone.length > 15;
   };
 
-  // 🛠️ تابع نمایش نام هوشمند
+  // تابع نمایش نام هوشمند
   const getDisplayName = (contact: Contact) => {
     if (contact.pushName) return contact.pushName;
-    if (isGroup(contact.phone)) return "گروه واتساپ";
-    return contact.phone; // اگر نام نداشت، شماره را نشان بده
+    if (isGroup(contact.phone)) return t('whatsappGroup'); // 👈 ترجمه
+    return contact.phone; 
   };
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">مخاطبین و گروه‌ها</h2>
-          <p className="text-muted-foreground mt-1">مدیریت مشتریان و گفتگوهای فعال</p>
+          <h2 className="text-3xl font-bold tracking-tight">{t('title')}</h2>
+          <p className="text-muted-foreground mt-1">{t('subtitle')}</p>
         </div>
         <Button>
             <User className="ml-2 h-4 w-4" />
-            افزودن دستی
+            {t('addManual')}
         </Button>
       </div>
 
@@ -83,7 +85,7 @@ export default function ContactsPage() {
           <div className="relative flex-1 max-w-md">
             <Search className="absolute right-3 top-2.5 h-4 w-4 text-slate-400" />
             <Input 
-              placeholder="جستجو (نام، شماره یا شناسه گروه)..." 
+              placeholder={t('searchPlaceholder')} 
               className="pr-9"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -91,9 +93,9 @@ export default function ContactsPage() {
           </div>
           <div className="text-sm text-slate-500 mr-auto hidden md:block">
             {loading ? (
-                <span className="flex items-center gap-2"><Loader2 className="h-3 w-3 animate-spin"/> بروزرسانی...</span>
+                <span className="flex items-center gap-2"><Loader2 className="h-3 w-3 animate-spin"/> {t('updating')}</span>
             ) : (
-                <span>{contacts.length} مورد یافت شد</span>
+                <span>{t('itemsFound', { count: contacts.length })}</span>
             )}
           </div>
         </CardContent>
@@ -115,7 +117,6 @@ export default function ContactsPage() {
                   <Avatar className="h-14 w-14 border-2 border-slate-100 shadow-sm">
                     <AvatarImage src={contact.profilePicUrl} />
                     <AvatarFallback className={`${isContactGroup ? 'bg-orange-500' : 'bg-gradient-to-tr from-blue-500 to-purple-500'} text-white`}>
-                      {/* اگر گروه بود آیکون گروه، اگر کاربر بود آیکون کاربر */}
                       {isContactGroup ? <Users className="h-6 w-6" /> : (displayName[0] || "U")}
                     </AvatarFallback>
                   </Avatar>
@@ -126,18 +127,16 @@ export default function ContactsPage() {
                     </CardTitle>
                     
                     <p className="text-xs text-muted-foreground font-mono mt-1 dir-ltr text-right truncate opacity-70">
-                      {/* اگر گروه بود، شناسه گروه را بنویس، اگر کاربر بود شماره */}
-                      {contact.pushName ? contact.phone : (isContactGroup ? "شناسه گروه" : "بدون نام ذخیره شده")}
+                      {contact.pushName ? contact.phone : (isContactGroup ? t('groupId') : t('noSavedName'))} {/* 👈 ترجمه */}
                     </p>
                   </div>
                 </CardHeader>
                 
                 <CardContent className="space-y-4">
                   <div className="flex flex-wrap gap-1 min-h-[1.5rem]">
-                    {/* اگر گروه بود، یک تگ "گروه" اضافه کن */}
                     {isContactGroup && (
                         <Badge variant="outline" className="border-orange-200 text-orange-600 bg-orange-50 px-1.5 text-[10px]">
-                            گروه
+                            {t('group')}
                         </Badge>
                     )}
                     
@@ -150,7 +149,7 @@ export default function ContactsPage() {
                     ) : (
                       !isContactGroup && (
                         <span className="text-xs text-slate-400 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <Tag className="h-3 w-3" /> بدون برچسب
+                            <Tag className="h-3 w-3" /> {t('noTag')}
                         </span>
                       )
                     )}
@@ -159,12 +158,12 @@ export default function ContactsPage() {
                   <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800">
                      <div className="text-xs text-slate-500 flex items-center gap-1">
                         <MessageSquare className="h-3 w-3" />
-                        {contact._count.conversations} پیام
+                        {t('messagesCount', { count: contact._count.conversations })}
                      </div>
                      
                      <Link href={`/${currentLocale}/dashboard/chat?chatId=${contact.id}`}>
                        <Button size="sm" variant="ghost" className="h-7 text-blue-600 hover:text-blue-700 hover:bg-blue-50">
-                          {isContactGroup ? 'باز کردن گروه' : 'گفتگو'}
+                          {isContactGroup ? t('openGroup') : t('chat')} {/* 👈 ترجمه */}
                        </Button>
                      </Link>
                   </div>
@@ -175,7 +174,7 @@ export default function ContactsPage() {
         ) : (
           <div className="col-span-full flex flex-col items-center justify-center py-20 text-slate-400 bg-slate-50 rounded-xl border border-dashed">
              <User className="h-12 w-12 mb-4 opacity-50" />
-             <p>هیچ مخاطب یا گروهی یافت نشد.</p>
+             <p>{t('noContactsFound')}</p>
           </div>
         )}
       </div>

@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from "react";
 import { api } from "@/lib/api";
+import { useTranslations } from "next-intl"; // 👈 هوک ترجمه
 import { 
-  Card, CardContent, CardHeader, CardTitle, CardDescription 
+  Card, CardContent 
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,7 +16,7 @@ import {
 import { 
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow 
 } from "@/components/ui/table";
-import { Loader2, Plus, MessageSquareText, Trash2, Zap, Copy } from "lucide-react";
+import { Loader2, Plus, Trash2, Zap, Copy } from "lucide-react";
 
 interface CannedResponse {
   id: number;
@@ -24,15 +25,16 @@ interface CannedResponse {
 }
 
 export default function CannedResponsesPage() {
+  const t = useTranslations('CrmCanned'); // 👈 کلید ترجمه
+  const tCommon = useTranslations('Common');
+
   const [responses, setResponses] = useState<CannedResponse[]>([]);
   const [loading, setLoading] = useState(true);
   
-  // استیت‌های فرم ساخت
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [newResponse, setNewResponse] = useState({ shortcut: "", content: "" });
   const [submitLoading, setSubmitLoading] = useState(false);
 
-  // دریافت اطلاعات از سرور
   const fetchResponses = async () => {
     try {
       const res = await api.get("/crm/canned-responses");
@@ -48,49 +50,39 @@ export default function CannedResponsesPage() {
     fetchResponses();
   }, []);
 
-  // ارسال فرم ساخت پاسخ جدید
   const handleCreate = async () => {
     if (!newResponse.shortcut || !newResponse.content) return;
     
     setSubmitLoading(true);
     try {
       const res = await api.post("/crm/canned-responses", newResponse);
-      setResponses([res.data, ...responses]); // افزودن به ابتدای لیست
-      setIsDialogOpen(false); // بستن مودال
-      setNewResponse({ shortcut: "", content: "" }); // پاک کردن فرم
-      alert("پاسخ آماده با موفقیت ساخته شد.");
+      setResponses([res.data, ...responses]); 
+      setIsDialogOpen(false); 
+      setNewResponse({ shortcut: "", content: "" }); 
+      alert(t('successCreate'));
     } catch (error) {
-      alert("خطا در ذخیره پاسخ آماده");
+      alert(t('errorCreate'));
     } finally {
       setSubmitLoading(false);
     }
   };
 
     const handleDelete = async (id: number) => {
-        // 1. تاییدیه گرفتن از کاربر
-        const confirmDelete = window.confirm("آیا از حذف این مورد اطمینان دارید؟");
+        const confirmDelete = window.confirm(t('confirmDelete'));
         if (!confirmDelete) return;
         
         try {
-            // 2. فراخوانی API
-            // دقت کنید که از id استفاده شده باشد
             await api.delete(`/crm/canned-responses/${id}`);
-            
-            // 3. آپدیت لیست در صورت موفقیت (حذف از آرایه state)
             setResponses(prev => prev.filter(item => item.id !== id));
-            
-            // پیام موفقیت (اختیاری)
-            // alert("حذف شد"); 
         } catch (error) {
-            console.error("خطا در حذف:", error);
-            alert("خطا در حذف آیتم. لطفا کنسول مرورگر را چک کنید.");
+            console.error(error);
+            alert(t('errorDelete'));
         }
     };
 
-  // کپی کردن متن (قابلیت اضافی)
   const handleCopy = (text: string) => {
     navigator.clipboard.writeText(text);
-    alert("متن کپی شد!");
+    alert(t('copySuccess'));
   };
   
 
@@ -102,9 +94,9 @@ export default function CannedResponsesPage() {
         <div>
             <h1 className="text-3xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
                 <Zap className="h-8 w-8 text-yellow-500" />
-                پاسخ‌های آماده
+                {t('title')}
             </h1>
-            <p className="text-slate-500 mt-1">مدیریت متن‌های پرتکرار برای پاسخ‌دهی سریع‌تر.</p>
+            <p className="text-slate-500 mt-1">{t('description')}</p>
         </div>
 
         {/* دکمه افزودن */}
@@ -112,30 +104,31 @@ export default function CannedResponsesPage() {
             <DialogTrigger asChild>
                 <Button className="bg-blue-600 hover:bg-blue-700">
                     <Plus className="mr-2 h-4 w-4" />
-                    افزودن پاسخ جدید
+                    {t('addBtn')}
                 </Button>
             </DialogTrigger>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>ساخت پاسخ آماده جدید</DialogTitle>
+                    <DialogTitle>{t('dialog.title')}</DialogTitle>
                     <DialogDescription>
-                        یک میانبر کوتاه و متن کامل پیام را وارد کنید.
+                        {t('dialog.desc')}
                     </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4 py-4">
                     <div className="space-y-2">
-                        <Label>کد میانبر (Shortcut)</Label>
+                        <Label>{t('dialog.shortcutLabel')}</Label>
                         <Input 
-                            placeholder="مثلا: /hi" 
+                            placeholder="/hi" 
+                            className="text-left dir-ltr"
                             value={newResponse.shortcut}
                             onChange={(e) => setNewResponse({...newResponse, shortcut: e.target.value})}
                         />
-                        <p className="text-xs text-slate-400">از این کد برای پیدا کردن سریع پیام استفاده می‌شود.</p>
+                        <p className="text-xs text-slate-400">{t('dialog.shortcutHelp')}</p>
                     </div>
                     <div className="space-y-2">
-                        <Label>متن پیام</Label>
+                        <Label>{t('dialog.contentLabel')}</Label>
                         <Textarea 
-                            placeholder="متن کامل پیام خود را اینجا بنویسید..." 
+                            placeholder={t('dialog.contentPlaceholder')}
                             className="h-32 resize-none"
                             value={newResponse.content}
                             onChange={(e) => setNewResponse({...newResponse, content: e.target.value})}
@@ -143,9 +136,9 @@ export default function CannedResponsesPage() {
                     </div>
                 </div>
                 <DialogFooter>
-                    <Button variant="outline" onClick={() => setIsDialogOpen(false)}>انصراف</Button>
+                    <Button variant="outline" onClick={() => setIsDialogOpen(false)}>{t('dialog.cancel')}</Button>
                     <Button onClick={handleCreate} disabled={submitLoading || !newResponse.shortcut || !newResponse.content}>
-                        {submitLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "ذخیره"}
+                        {submitLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : t('dialog.save')}
                     </Button>
                 </DialogFooter>
             </DialogContent>
@@ -158,9 +151,9 @@ export default function CannedResponsesPage() {
             <Table>
                 <TableHeader>
                     <TableRow className="bg-slate-50">
-                        <TableHead className="w-[150px]">میانبر</TableHead>
-                        <TableHead>متن پیام</TableHead>
-                        <TableHead className="w-[100px] text-left">عملیات</TableHead>
+                        <TableHead className="w-[150px]">{t('table.shortcut')}</TableHead>
+                        <TableHead>{t('table.content')}</TableHead>
+                        <TableHead className="w-[100px] text-left">{t('table.actions')}</TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -168,20 +161,20 @@ export default function CannedResponsesPage() {
                         <TableRow>
                             <TableCell colSpan={3} className="h-24 text-center text-slate-500">
                                 <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
-                                در حال بارگذاری...
+                                {tCommon('loading')}
                             </TableCell>
                         </TableRow>
                     ) : responses.length === 0 ? (
                         <TableRow>
                             <TableCell colSpan={3} className="h-24 text-center text-slate-500">
-                                هیچ پاسخ آماده‌ای تعریف نشده است.
+                                {t('noData')}
                             </TableCell>
                         </TableRow>
                     ) : (
                         responses.map((item) => (
                             <TableRow key={item.id}>
                                 <TableCell>
-                                    <span className="font-mono bg-slate-100 px-2 py-1 rounded text-slate-700 text-sm">
+                                    <span className="font-mono bg-slate-100 px-2 py-1 rounded text-slate-700 text-sm dir-ltr inline-block">
                                         {item.shortcut}
                                     </span>
                                 </TableCell>
@@ -190,7 +183,7 @@ export default function CannedResponsesPage() {
                                 </TableCell>
                                 <TableCell>
                                     <div className="flex items-center justify-end gap-1">
-                                        <Button variant="ghost" size="icon" onClick={() => handleCopy(item.content)} title="کپی متن">
+                                        <Button variant="ghost" size="icon" onClick={() => handleCopy(item.content)} title={t('copyTooltip')}>
                                             <Copy className="h-4 w-4 text-slate-400" />
                                         </Button>
                                         <Button variant="ghost" size="icon" onClick={() => handleDelete(item.id)} className="text-red-500 hover:bg-red-50">

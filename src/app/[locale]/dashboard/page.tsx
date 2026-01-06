@@ -5,16 +5,14 @@ import { api } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { MessageSquare, Users, Activity, BarChart3, Loader2, ArrowUpRight, ArrowDownLeft } from "lucide-react";
 import { 
-  AreaChart, 
-  Area, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  ResponsiveContainer 
-} from 'recharts'; // 👈 ایمپورت‌های نمودار
+  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer 
+} from 'recharts';
+import { useTranslations, useLocale } from "next-intl"; // 👈 ایمپورت‌های جدید
 
 export default function DashboardPage() {
+  const t = useTranslations('Dashboard'); // 👈 دسترسی به ترجمه‌های داشبورد
+  const locale = useLocale(); // 👈 دریافت زبان فعلی (fa یا en)
+  
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
@@ -43,36 +41,40 @@ export default function DashboardPage() {
     <div className="space-y-8 animate-in fade-in-50 duration-500">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">داشبورد</h2>
-          <p className="text-muted-foreground mt-2">خوش آمدید! وضعیت سیستم پایدار است.</p>
+          <h2 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
+            {t('title')}
+          </h2>
+          <p className="text-muted-foreground mt-2">
+            {t('subtitle')}
+          </p>
         </div>
       </div>
 
       {/* کارت‌های آمار */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <StatsCard 
-          title="کل پیام‌ها" 
+          title={t('totalMessages')}
           value={stats?.messages.total.toLocaleString()} 
-          desc={`${stats?.messages.today} پیام جدید امروز`} 
+          desc={t('newMessages', {count: stats?.messages.today})} // 👈 استفاده از پارامتر
           icon={MessageSquare} 
         />
         <StatsCard 
-          title="مخاطبین فعال" 
+          title={t('activeContacts')}
           value={stats?.contacts.total.toLocaleString()} 
-          desc={`${stats?.contacts.new} مخاطب جدید امروز`} 
+          desc={t('newContacts', {count: stats?.contacts.new})}
           icon={Users} 
         />
         <StatsCard 
-          title="وضعیت اتصال" 
-          value={stats?.whatsapp.status === 'CONNECTED' ? 'متصل' : 'قطع'} 
-          desc={`پینگ: ${stats?.whatsapp.ping}`} 
+          title={t('connectionStatus')}
+          value={stats?.whatsapp.status === 'CONNECTED' ? t('connected') : t('disconnected')} 
+          desc={t('ping', {value: stats?.whatsapp.ping})}
           icon={Activity} 
           success={stats?.whatsapp.status === 'CONNECTED'}
         />
         <StatsCard 
-          title="صف ارسال" 
+          title={t('queue')}
           value={stats?.campaigns.active} 
-          desc={`${stats?.campaigns.completed} ارسال موفق`} 
+          desc={t('sentSuccessfully', {count: stats?.campaigns.completed})}
           icon={BarChart3} 
         />
       </div>
@@ -83,7 +85,7 @@ export default function DashboardPage() {
         {/* 📊 نمودار فعالیت هفته */}
         <Card className="col-span-4 shadow-sm">
           <CardHeader>
-            <CardTitle>فعالیت هفته (پیام‌های ارسالی و دریافتی)</CardTitle>
+            <CardTitle>{t('chartTitle')}</CardTitle>
           </CardHeader>
           <CardContent className="pl-0">
             <div className="h-[300px] w-full pr-4">
@@ -122,7 +124,7 @@ export default function DashboardPage() {
                         strokeWidth={2}
                         fillOpacity={1} 
                         fill="url(#colorSent)" 
-                        name="ارسالی" 
+                        name={t('sent')} // 👈 ترجمه لیبل نمودار
                      />
                      <Area 
                         type="monotone" 
@@ -131,13 +133,13 @@ export default function DashboardPage() {
                         strokeWidth={2}
                         fillOpacity={1} 
                         fill="url(#colorReceived)" 
-                        name="دریافتی" 
+                        name={t('received')} // 👈 ترجمه لیبل نمودار
                      />
                    </AreaChart>
                  </ResponsiveContainer>
                ) : (
                  <div className="h-full flex items-center justify-center text-slate-400">
-                   داده‌ای برای نمایش وجود ندارد
+                   {t('noData')}
                  </div>
                )}
             </div>
@@ -147,7 +149,7 @@ export default function DashboardPage() {
         {/* لیست فعالیت‌های اخیر */}
         <Card className="col-span-3 shadow-sm">
           <CardHeader>
-            <CardTitle>آخرین فعالیت‌ها</CardTitle>
+            <CardTitle>{t('recentActivity')}</CardTitle>
           </CardHeader>
           <CardContent>
              <div className="space-y-6 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
@@ -166,12 +168,13 @@ export default function DashboardPage() {
                         </p>
                       </div>
                       <span className="text-[10px] text-slate-400 whitespace-nowrap mr-2">
-                        {new Date(act.time).toLocaleTimeString('fa-IR', {hour: '2-digit', minute:'2-digit'})}
+                        {/* 👈 فرمت تاریخ بر اساس زبان */}
+                        {new Date(act.time).toLocaleTimeString(locale === 'fa' ? 'fa-IR' : 'en-US', {hour: '2-digit', minute:'2-digit'})}
                       </span>
                     </div>
                   ))
                 ) : (
-                  <p className="text-sm text-slate-400 text-center py-8">هنوز فعالیتی ثبت نشده است.</p>
+                  <p className="text-sm text-slate-400 text-center py-8">{t('noActivity')}</p>
                 )}
              </div>
           </CardContent>

@@ -12,6 +12,7 @@ import {
   Image as ImageIcon, FileText, Download 
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useTranslations } from "next-intl"; // 👈 ۱. اضافه شده
 
 // --- تایپ‌ها ---
 interface Message {
@@ -39,6 +40,8 @@ interface Conversation {
 }
 
 export default function ChatPage() {
+  const t = useTranslations('Chat'); // 👈 ۲. هوک ترجمه
+
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedChatId, setSelectedChatId] = useState<number | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -55,25 +58,24 @@ export default function ChatPage() {
   const isGroup = (phone: string) => phone.includes('-') || phone.length > 15;
 
   const formatPhoneNumber = (phone: string) => {
-    if (!phone) return "ناشناس";
-    if (isGroup(phone)) return "گروه";
+    if (!phone) return t('unknown'); // 👈 ترجمه
+    if (isGroup(phone)) return t('group'); // 👈 ترجمه
     if (phone.startsWith('98') && phone.length >= 10) return '0' + phone.substring(2);
     if (phone.startsWith('+98')) return '0' + phone.substring(3);
     return phone;
   };
 
   const getDisplayName = (contact?: Contact) => {
-    if (!contact) return "کاربر ناشناس";
+    if (!contact) return t('unknownUser'); // 👈 ترجمه
     if (contact.pushName) return contact.pushName;
-    if (isGroup(contact.phone)) return "گروه واتساپ";
+    if (isGroup(contact.phone)) return t('whatsappGroup'); // 👈 ترجمه
     return formatPhoneNumber(contact.phone);
   };
 
-  // 👇 تابع جدید برای ساخت آدرس کامل فایل
+  // تابع جدید برای ساخت آدرس کامل فایل
   const getFullMediaUrl = (path?: string) => {
     if (!path) return null;
     if (path.startsWith("http")) return path;
-    // آدرس سرور را اینجا تنظیم کنید
     const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
     return `${baseUrl}${path}`;
   };
@@ -122,7 +124,7 @@ export default function ChatPage() {
       const res = await api.get("/whatsapp/conversations");
       setConversations(res.data);
     } catch (error) {
-      console.error("❌ خطا در دریافت لیست چت:", error);
+      console.error("❌ Error fetching chats:", error);
     }
   };
 
@@ -132,7 +134,7 @@ export default function ChatPage() {
       const res = await api.get(`/whatsapp/messages/${conversationId}`);
       setMessages(res.data);
     } catch (error) {
-      console.error("❌ خطا در دریافت پیام‌ها:", error);
+      console.error("❌ Error fetching messages:", error);
     } finally {
       setLoadingMessages(false);
     }
@@ -151,7 +153,7 @@ export default function ChatPage() {
       const tempId = -Date.now();
       const newChat: Conversation = {
         id: tempId,
-        contact: { id: tempId, phone: searchPhone, pushName: 'مخاطب جدید' },
+        contact: { id: tempId, phone: searchPhone, pushName: t('unknown') },
         unreadCount: 0,
         lastMessageAt: new Date().toISOString(),
         messages: []
@@ -181,13 +183,31 @@ export default function ChatPage() {
     setInputText("");
 
     try {
+      // 👇 اصلاح و استانداردسازی شماره موبایل قبل از ارسال به سرور
+      let targetPhone = chat.contact.phone;
+      
+      // ۱. حذف تمام کاراکترهای غیر عددی (مثل + یا - یا فاصله)
+      targetPhone = targetPhone.replace(/\D/g, ''); 
+      
+      // ۲. اگر با 09 شروع می‌شود، 0 را با 98 عوض کن
+      if (targetPhone.startsWith('09')) {
+        targetPhone = '98' + targetPhone.substring(1);
+      }
+      // ۳. اگر ۱۰ رقم است و با 9 شروع می‌شود (مثل 912...)، 98 را اضافه کن
+      else if (targetPhone.length === 10 && targetPhone.startsWith('9')) {
+        targetPhone = '98' + targetPhone;
+      }
+
+      // ارسال درخواست با شماره اصلاح شده
       await api.post("/whatsapp/send/text", {
-        phone: chat.contact.phone,
+        phone: targetPhone, 
         message: optimisticMsg.text
       });
+      
       setTimeout(() => fetchConversations(), 1000);
     } catch (error) {
-      alert("خطا در ارسال پیام.");
+      console.error(error);
+      alert("Error sending message.");
     }
   };
 
@@ -212,28 +232,24 @@ export default function ChatPage() {
 
   // --- رندر محتوای پیام (تکست، عکس، فایل) ---
   const renderMessageContent = (msg: Message) => {
-    // تبدیل آدرس نسبی به آدرس کامل
     const fullMediaUrl = getFullMediaUrl(msg.mediaUrl);
 
-    // ۱. اگر عکس باشد
     if (msg.type === 'image') {
       return (
         <div className="flex flex-col gap-2 max-w-[260px]">
-           {/* اگر لینک مدیا داشته باشیم (با آدرس کامل) نمایش می‌دهیم */}
            {fullMediaUrl ? (
              <img 
                 src={fullMediaUrl} 
-                alt="تصویر" 
+                alt="Image" 
                 className="rounded-md w-full h-auto object-cover border border-slate-200 dark:border-slate-700 cursor-pointer hover:opacity-90 transition-opacity"
-                onClick={() => window.open(fullMediaUrl, '_blank')} // باز کردن عکس در تب جدید
+                onClick={() => window.open(fullMediaUrl, '_blank')}
              />
            ) : (
              <div className="bg-slate-200 dark:bg-slate-800 h-40 w-full rounded-md flex flex-col items-center justify-center text-slate-500 gap-2 border-2 border-dashed border-slate-300 dark:border-slate-700">
                 <ImageIcon className="h-8 w-8 opacity-50" />
-                <span className="text-[10px] opacity-70">تصویر (بدون پیش‌نمایش)</span>
+                <span className="text-[10px] opacity-70">{t('imageNoPreview')}</span> {/* 👈 ترجمه */}
              </div>
            )}
-           {/* نمایش متن کپشن (اگر [Image] نباشد) */}
            {msg.text && msg.text !== '[Image]' && (
              <p className="text-sm leading-relaxed px-1">{msg.text}</p>
            )}
@@ -241,7 +257,6 @@ export default function ChatPage() {
       );
     }
 
-    // ۲. اگر فایل باشد
     if (msg.type === 'document') {
       return (
         <div className="flex flex-col gap-1 min-w-[200px]">
@@ -250,8 +265,9 @@ export default function ChatPage() {
                     <FileText className="h-5 w-5 text-orange-600 dark:text-orange-300" />
                 </div>
                 <div className="flex-1 overflow-hidden">
-                    <p className="text-sm font-medium truncate dir-ltr">{msg.text.replace('[Document]', 'فایل ضمیمه')}</p>
-                    <span className="text-[10px] opacity-70">سند / فایل</span>
+                    {/* 👈 ترجمه */}
+                    <p className="text-sm font-medium truncate dir-ltr">{msg.text.replace('[Document]', t('attachment'))}</p>
+                    <span className="text-[10px] opacity-70">{t('docLabel')}</span> {/* 👈 ترجمه */}
                 </div>
                 {fullMediaUrl && (
                     <a href={fullMediaUrl} target="_blank" rel="noopener noreferrer" className="p-2 hover:bg-black/10 rounded-full transition-colors">
@@ -263,7 +279,6 @@ export default function ChatPage() {
       );
     }
 
-    // ۳. پیش‌فرض (متن)
     return <p className="leading-relaxed whitespace-pre-wrap text-sm">{msg.text}</p>;
   };
 
@@ -280,7 +295,7 @@ export default function ChatPage() {
         <div className="p-4 border-b border-slate-200 dark:border-slate-800 shrink-0 flex gap-2">
           <div className="relative flex-1">
             <Search className="absolute right-3 top-2.5 h-4 w-4 text-slate-400" />
-            <Input placeholder="جستجو..." className="pr-9 bg-white dark:bg-slate-950" />
+            <Input placeholder={t('search')} className="pr-9 bg-white dark:bg-slate-950" /> {/* 👈 ترجمه */}
           </div>
           <Button variant="outline" size="icon" onClick={() => setIsNewChatOpen(true)} className="bg-white dark:bg-slate-950">
             <Plus className="h-4 w-4 text-blue-600" />
@@ -290,7 +305,7 @@ export default function ChatPage() {
         {isNewChatOpen && (
             <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border-b border-blue-100 animate-in slide-in-from-top-2">
                 <div className="flex justify-between items-center mb-2">
-                    <span className="text-xs font-bold text-blue-700">شماره موبایل:</span>
+                    <span className="text-xs font-bold text-blue-700">{t('phone')}:</span> {/* 👈 ترجمه */}
                     <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => setIsNewChatOpen(false)}>
                         <X className="h-3 w-3" />
                     </Button>
@@ -303,7 +318,7 @@ export default function ChatPage() {
                         className="bg-white h-8 text-sm dir-ltr"
                         autoFocus
                     />
-                    <Button size="sm" onClick={startNewChat} className="h-8 bg-blue-600 text-white">شروع</Button>
+                    <Button size="sm" onClick={startNewChat} className="h-8 bg-blue-600 text-white">{t('start')}</Button> {/* 👈 ترجمه */}
                 </div>
             </div>
         )}
@@ -329,7 +344,8 @@ export default function ChatPage() {
                     </div>
                     <div className="flex items-center justify-between">
                       <p className="text-xs text-slate-500 truncate max-w-[140px] dir-rtl text-right">
-                          {chat.messages?.[0]?.type === 'image' ? '📷 تصویر' : chat.messages?.[0]?.text || "..."}
+                          {/* 👈 ترجمه و آیکون */}
+                          {chat.messages?.[0]?.type === 'image' ? `📷 ${t('image')}` : chat.messages?.[0]?.text || "..."}
                       </p>
                       {chat.unreadCount > 0 && (
                         <span className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-600 text-[10px] font-bold text-white">{chat.unreadCount}</span>
@@ -350,7 +366,6 @@ export default function ChatPage() {
           <>
             <div className="h-16 shrink-0 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-4 bg-white dark:bg-slate-900 z-10">
               <div className="flex items-center gap-3">
-                {/* دکمه بازگشت برای موبایل */}
                 <Button 
                     variant="ghost" 
                     size="icon" 
@@ -381,7 +396,7 @@ export default function ChatPage() {
                  ) : messages.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-full text-slate-400 opacity-70">
                       <MessageSquare className="h-12 w-12 mb-2" />
-                      <p>هنوز پیامی نیست.</p>
+                      <p>{t('noMessages')}</p> {/* 👈 ترجمه */}
                     </div>
                  ) : (
                    messages.map((msg) => (
@@ -392,7 +407,6 @@ export default function ChatPage() {
                             : "mr-auto bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-bl-none border-slate-200 dark:border-slate-700"
                        )}>
                        
-                       {/* نمایش محتوای پیام (اصلاح شده) */}
                        {renderMessageContent(msg)}
 
                        <span className={cn("text-[10px] self-end opacity-70", msg.isFromMe ? "text-blue-100" : "text-slate-400")}>
@@ -407,7 +421,7 @@ export default function ChatPage() {
             <div className="p-3 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 shrink-0">
               <form onSubmit={handleSendMessage} className="flex items-center gap-2">
                 <Button type="button" variant="ghost" size="icon" className="text-slate-400"><Paperclip className="h-5 w-5" /></Button>
-                <Input value={inputText} onChange={(e) => setInputText(e.target.value)} placeholder="پیام..." className="flex-1 bg-slate-100 dark:bg-slate-800 border-0 focus-visible:ring-0" />
+                <Input value={inputText} onChange={(e) => setInputText(e.target.value)} placeholder={t('typeMessage')} className="flex-1 bg-slate-100 dark:bg-slate-800 border-0 focus-visible:ring-0" /> {/* 👈 ترجمه */}
                 <Button type="submit" disabled={!inputText.trim()} className="bg-blue-600 hover:bg-blue-700 text-white rounded-full h-10 w-10 p-0 shadow-sm">
                   <Send className={cn("h-4 w-4 rotate-180", !inputText.trim() ? "opacity-50" : "")} />
                 </Button>
@@ -417,7 +431,7 @@ export default function ChatPage() {
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center text-slate-400 bg-slate-50/30">
              <div className="w-24 h-24 bg-slate-100 dark:bg-slate-900 rounded-full flex items-center justify-center mb-4"><MessageSquare className="h-10 w-10 text-slate-300" /></div>
-             <p>یک گفتگو را انتخاب کنید.</p>
+             <p>{t('startChat')}</p> {/* 👈 ترجمه */}
           </div>
         )}
       </div>

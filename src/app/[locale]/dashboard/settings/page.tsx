@@ -1,13 +1,14 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react"; // useRef اضافه شد
+import { useState, useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
 import { io } from "socket.io-client";
-import { api } from "@/lib/api";
+import { api } from "@/lib/api"; // استفاده از api مرکزی
+import { useTranslations } from "next-intl"; // 👈 هوک ترجمه
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, QrCode, Wifi, WifiOff, RefreshCw, LogOut, Unplug } from "lucide-react";
+import { Loader2, Wifi, WifiOff, RefreshCw, LogOut, Unplug } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -21,6 +22,7 @@ import {
 } from "@/components/ui/alert-dialog";
 
 export default function SettingsPage() {
+  const t = useTranslations('Settings'); // 👈 دسترسی به کلیدهای Settings
   const pathname = usePathname();
   const currentLocale = pathname.split('/')[1] || 'fa';
 
@@ -30,7 +32,6 @@ export default function SettingsPage() {
   const [logs, setLogs] = useState<string[]>([]);
   const [loadingAction, setLoadingAction] = useState(false);
 
-  // برای جلوگیری از اجرای تکراری درخواست‌ها
   const isStartingRef = useRef(false);
 
   // خروج از پنل مدیریت
@@ -40,51 +41,49 @@ export default function SettingsPage() {
     window.location.href = `/${currentLocale}/login`;
   };
 
-  // قطع اتصال واتساپ
-  const disconnectWhatsapp = async () => {
-    try {
-      setLoadingAction(true);
-      addLog("⚠️ در حال قطع اتصال واتساپ...");
-      await api.delete("/whatsapp/session"); 
-      setStatus("DISCONNECTED");
-      setQrCode(null);
-      setPhone(null);
-      addLog("✅ واتساپ قطع شد.");
-    } catch (error) {
-      console.error(error);
-      addLog("❌ خطا در قطع ارتباط واتساپ.");
-    } finally {
-      setLoadingAction(false);
-    }
-  };
-
   // تابع لاگ‌انداز
   const addLog = (msg: string) => {
     setLogs(prev => [msg, ...prev].slice(0, 5));
   };
 
+  // قطع اتصال واتساپ
+  const disconnectWhatsapp = async () => {
+    try {
+      setLoadingAction(true);
+      addLog(t('logDisconnect'));
+      await api.delete("/whatsapp/session"); 
+      setStatus("DISCONNECTED");
+      setQrCode(null);
+      setPhone(null);
+      addLog(t('logDisconnected'));
+    } catch (error) {
+      console.error(error);
+      addLog(t('logErrorDisconnect'));
+    } finally {
+      setLoadingAction(false);
+    }
+  };
+
   // استارت دستی یا خودکار ربات
   const startSession = async () => {
-    if (isStartingRef.current) return; // اگر قبلاً درخواست داده، دوباره نده
+    if (isStartingRef.current) return; 
     isStartingRef.current = true;
     
     try {
-      // فقط اگر دستی کلیک شده بود لودینگ نشان بده
       if (!loadingAction) setLoadingAction(true); 
       
-      addLog("🚀 تلاش برای اتصال به واتساپ...");
+      addLog(t('logStart'));
       await api.post("/whatsapp/start", {});
       
-      // موفقیت‌آمیز بود، اما وضعیت نهایی را سوکت یا پولینگ آپدیت می‌کند
     } catch (error) {
-      addLog("❌ خطا در استارت ربات.");
+      addLog(t('logErrorStart'));
     } finally {
       setLoadingAction(false);
       isStartingRef.current = false;
     }
   };
 
-  // تابع بررسی وضعیت (قلب تپنده صفحه)
+  // بررسی وضعیت
   const checkStatus = async (autoStart = false) => {
     try {
       const res = await api.get("/whatsapp/status");
@@ -93,7 +92,6 @@ export default function SettingsPage() {
       if (backendStatus === "CONNECTED") {
         setStatus("CONNECTED");
         setPhone(res.data.phone);
-        // اگر قبلاً QR داشتیم پاکش کن
         setQrCode(null);
       } else if (backendStatus === "SCAN_QR") {
          setStatus("SCAN_QR");
@@ -101,23 +99,21 @@ export default function SettingsPage() {
       } else {
         setStatus("DISCONNECTED");
         
-        // 🔥 جادوی اتصال خودکار:
-        // اگر وضعیت قطع بود و ما اجازه استارت خودکار داشتیم، دکمه را بزن!
         if (autoStart) {
-            console.log("🔄 وضعیت قطع است، تلاش برای اتصال خودکار...");
+            console.log("🔄 Auto starting session...");
             startSession();
         }
       }
     } catch (error: any) {
-      console.error("❌ خطا در ارتباط با سرور:", error.message);
+      console.error("❌ Status Check Error:", error.message);
       setStatus("DISCONNECTED");
     }
   };
 
-  // مدیریت چرخه حیات و سوکت
   useEffect(() => {
-    // ۱. اتصال به سوکت
-    const socket = io("http://localhost:3000");
+    // اتصال به سوکت
+    const socketUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+    const socket = io(socketUrl);
 
     socket.on("connect", () => {
         console.log("Socket connected");
@@ -126,30 +122,26 @@ export default function SettingsPage() {
     socket.on("session:qr", (data) => {
       setStatus("SCAN_QR");
       setQrCode(data.qr);
-      addLog("📷 بارکد جدید دریافت شد (اسکن کنید)");
+      addLog(t('logQr'));
     });
 
     socket.on("session:connected", (data) => {
       setStatus("CONNECTED");
       setQrCode(null);
       setPhone(data.phone);
-      addLog(`✅ متصل شد: ${data.phone}`);
+      addLog(t('logConnected', { phone: data.phone }));
     });
 
     socket.on("session:disconnected", () => {
       setStatus("DISCONNECTED");
-      addLog("❌ ارتباط قطع شد");
-      // اگر قطع شد، ۳ ثانیه بعد چک کن ببین می‌توانیم برگردیم؟
+      addLog(t('logConnectionLost'));
       setTimeout(() => checkStatus(true), 3000);
     });
 
-    // ۲. بررسی اولیه + استارت خودکار (true)
     checkStatus(true);
 
-    // ۳. بررسی دوره‌ای هر ۵ ثانیه (Polling)
-    // این باعث می‌شود حتی اگر سوکت کار نکند، وضعیت آپدیت شود
     const interval = setInterval(() => {
-        checkStatus(false); // اینجا false می‌فرستیم که هی پشت سر هم استارت نزند
+        checkStatus(false); 
     }, 5000);
 
     return () => {
@@ -161,26 +153,26 @@ export default function SettingsPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-3xl font-bold tracking-tight">تنظیمات اتصال</h2>
+        <h2 className="text-3xl font-bold tracking-tight">{t('title')}</h2>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">
         <Card className="md:col-span-1 border-slate-200 dark:border-slate-800 shadow-sm">
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
-              وضعیت واتساپ
+              {t('whatsappStatus')}
               {status === "CONNECTED" ? (
-                <Badge className="bg-green-500 hover:bg-green-600">متصل</Badge>
+                <Badge className="bg-green-500 hover:bg-green-600">{t('statusConnected')}</Badge>
               ) : status === "SCAN_QR" ? (
-                <Badge className="bg-yellow-500 hover:bg-yellow-600">انتظار اسکن</Badge>
+                <Badge className="bg-yellow-500 hover:bg-yellow-600">{t('statusScan')}</Badge>
               ) : status === "LOADING" ? (
-                <Badge className="bg-slate-500">در حال بررسی...</Badge>
+                <Badge className="bg-slate-500">{t('statusLoading')}</Badge>
               ) : (
-                <Badge variant="destructive">قطع</Badge>
+                <Badge variant="destructive">{t('statusDisconnected')}</Badge>
               )}
             </CardTitle>
             <CardDescription>
-              مدیریت اتصال ربات به شبکه واتساپ
+              {t('description')}
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col items-center justify-center min-h-[320px] space-y-6">
@@ -188,7 +180,7 @@ export default function SettingsPage() {
             {status === "LOADING" && (
               <div className="flex flex-col items-center gap-2">
                  <Loader2 className="h-10 w-10 animate-spin text-slate-400" />
-                 <p className="text-sm text-slate-400">در حال برقراری ارتباط با سرور...</p>
+                 <p className="text-sm text-slate-400">{t('loadingServer')}</p>
               </div>
             )}
 
@@ -197,10 +189,10 @@ export default function SettingsPage() {
                 <div className="h-20 w-20 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
                   <WifiOff className="h-10 w-10 text-slate-400" />
                 </div>
-                <p className="text-sm text-muted-foreground">هنوز متصل نشده‌اید.</p>
+                <p className="text-sm text-muted-foreground">{t('notConnected')}</p>
                 <Button onClick={() => startSession()} disabled={loadingAction} size="lg" className="w-full bg-blue-600 hover:bg-blue-700">
                   {loadingAction ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <RefreshCw className="mr-2 h-4 w-4" />}
-                  شروع اتصال جدید
+                  {t('startNew')}
                 </Button>
               </div>
             )}
@@ -211,7 +203,7 @@ export default function SettingsPage() {
                    <img src={qrCode} alt="Scan QR" className="w-56 h-56 object-contain" />
                 </div>
                 <p className="text-sm text-muted-foreground animate-pulse">
-                  لطفاً با واتساپ گوشی اسکن کنید...
+                  {t('scanPrompt')}
                 </p>
               </div>
             )}
@@ -223,7 +215,7 @@ export default function SettingsPage() {
                     <Wifi className="h-10 w-10 text-green-600 dark:text-green-400" />
                     </div>
                     <div>
-                    <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">شما آنلاین هستید!</h3>
+                    <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">{t('onlineMsg')}</h3>
                     <p className="font-mono text-slate-500 dir-ltr">{phone}</p>
                     </div>
                 </div>
@@ -233,20 +225,20 @@ export default function SettingsPage() {
                     <AlertDialogTrigger asChild>
                         <Button variant="secondary" className="w-full border border-slate-200 text-slate-700 hover:bg-slate-100">
                         <Unplug className="mr-2 h-4 w-4" />
-                        تغییر شماره
+                        {t('changeNumber')}
                         </Button>
                     </AlertDialogTrigger>
                     <AlertDialogContent>
                         <AlertDialogHeader>
-                        <AlertDialogTitle>خروج از واتساپ؟</AlertDialogTitle>
+                        <AlertDialogTitle>{t('logoutDialogTitle')}</AlertDialogTitle>
                         <AlertDialogDescription>
-                            ارتباط ربات با واتساپ قطع می‌شود و برای استفاده مجدد باید دوباره QR کد را اسکن کنید.
+                            {t('logoutDialogDesc')}
                         </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
-                        <AlertDialogCancel>انصراف</AlertDialogCancel>
+                        <AlertDialogCancel>{t('cancel')}</AlertDialogCancel>
                         <AlertDialogAction onClick={disconnectWhatsapp} className="bg-red-600 hover:bg-red-700">
-                            بله، قطع کن
+                            {t('confirmDisconnect')}
                         </AlertDialogAction>
                         </AlertDialogFooter>
                     </AlertDialogContent>
@@ -258,7 +250,7 @@ export default function SettingsPage() {
                     onClick={handleAppLogout} 
                     >
                     <LogOut className="mr-2 h-4 w-4" />
-                    خروج از پنل
+                    {t('logoutPanel')}
                     </Button>
                 </div>
               </div>
@@ -271,12 +263,12 @@ export default function SettingsPage() {
         <div className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle className="text-sm font-medium uppercase text-slate-500">ترمینال زنده</CardTitle>
+              <CardTitle className="text-sm font-medium uppercase text-slate-500">{t('liveTerminal')}</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="bg-slate-950 text-slate-50 p-4 rounded-lg font-mono text-xs h-[320px] overflow-y-auto custom-scrollbar" dir="ltr">
                 {logs.length === 0 ? (
-                  <span className="text-slate-600 opacity-50 flex h-full items-center justify-center">منتظر رویدادها...</span>
+                  <span className="text-slate-600 opacity-50 flex h-full items-center justify-center">{t('waitingEvents')}</span>
                 ) : (
                   logs.map((log, i) => (
                     <div key={i} className="border-b border-slate-800/50 last:border-0 py-2 flex items-start">

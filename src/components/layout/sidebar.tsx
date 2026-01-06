@@ -81,19 +81,19 @@ export function Sidebar() {
       roles: ['ADMIN', 'AGENT'] // همه می‌بینند
     },
     { 
-      name: "ارسال پیام فوری", 
+      name: t("sendText"), 
       href: `/${currentLocale}/dashboard/send`, 
       icon: Send,
       roles: ['ADMIN', 'AGENT']
     },
     { 
-      name: "ارسال تصویر", 
+      name:  t("sendImage"), 
       href: `/${currentLocale}/dashboard/send-image`, 
       icon: ImageIcon,
       roles: ['ADMIN', 'AGENT']
     }, 
     { 
-      name: "ارسال فایل (لینک)", 
+      name: t('sendFile'), 
       href: `/${currentLocale}/dashboard/send-file`, 
       icon: LinkIcon,
       roles: ['ADMIN', 'AGENT']
@@ -117,19 +117,19 @@ export function Sidebar() {
       roles: ['ADMIN'] // 👈 فقط ادمین ارسال انبوه انجام دهد (مثال)
     },
     { 
-      name: "تنظیم وب‌هوک", 
+      name: t('webhook'), 
       href: `/${currentLocale}/dashboard/webhook`, 
       icon: Webhook,
       roles: ['ADMIN'] // 👈 فقط ادمین
     },
     { 
-      name: "پاسخ خودکار", 
+      name: t('autoReply'), 
       href: `/${currentLocale}/dashboard/keywords`, 
       icon: Bot,
       roles: ['ADMIN'] // 👈 فقط ادمین
     }, 
     {
-      name: "سرویس OTP",
+      name: t("otp"),
       href: "/dashboard/otp",
       icon: ShieldCheck, // یا Lock
     },
@@ -137,37 +137,37 @@ export function Sidebar() {
     
     // 👇 بخش CRM
     {
-        name: "مدیریت مشتریان (CRM)",
+        name: t("crm"),
         icon: Users,
         href: "/dashboard/crm",
         roles: ['ADMIN', 'AGENT'],
         subItems: [
           { 
-            name: "داشبورد CRM", 
+            name: t('crmDashboard'), 
             href: `/${currentLocale}/dashboard/crm`, 
             icon: LayoutDashboard,
             roles: ['ADMIN', 'AGENT']
           },
           { 
-            name: "بررسی وضعیت", 
+            name: t('crmStatus'), 
             href: `/${currentLocale}/dashboard/crm/status`, 
             icon: Activity,
             roles: ['ADMIN', 'AGENT']
           },
           { 
-            name: "مدیریت اپراتورها", 
+            name: t('crmAgents'), 
             href: `/${currentLocale}/dashboard/crm/agents`, 
             icon: UserCog, 
             roles: ['ADMIN'] // ⛔️ فقط ادمین می‌بیند (علی نمی‌بیند)
           }, 
           { 
-            name: "لیست مشتریان", 
+            name: t('crmContacts'), 
             href: `/${currentLocale}/dashboard/crm/contacts`, // به صفحه لیست می‌رود
             icon: Contact, 
             roles: ['ADMIN', 'AGENT'] 
           },
           { 
-            name: "پاسخ‌های آماده", 
+            name: t('crmCanned'), 
             href: `/${currentLocale}/dashboard/crm/canned-responses`, 
             icon: Zap, 
             roles: ['ADMIN', 'AGENT'] 

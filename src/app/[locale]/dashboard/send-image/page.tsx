@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { api } from "@/lib/api";
+// import { api } from "@/lib/api"; // در اینجا چون FormData داریم، از fetch مستقیم استفاده می‌کنیم که راحت‌تر است
+import { useTranslations } from "next-intl"; // 👈 هوک ترجمه
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -10,30 +11,30 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Send, Phone, Image as ImageIcon, Loader2, CheckCircle2, AlertCircle, UploadCloud } from "lucide-react";
 
 export default function SendImagePage() {
+  const t = useTranslations('SendImage'); // 👈 دسترسی به کلیدهای SendImage
+  const tCommon = useTranslations('Common');
+
   const [phone, setPhone] = useState("");
   const [file, setFile] = useState<File | null>(null);
-  const [caption, setCaption] = useState(""); // اگر بک‌ند کپشن را پشتیبانی می‌کند
+  const [caption, setCaption] = useState(""); 
   const [preview, setPreview] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState<{ type: 'success' | 'error', msg: string } | null>(null);
 
-  // هندل کردن انتخاب فایل
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
     if (selectedFile) {
-      // بررسی نوع فایل (فقط عکس)
       if (!selectedFile.type.startsWith("image/")) {
-        setStatus({ type: 'error', msg: 'لطفاً فقط فایل عکس انتخاب کنید.' });
+        setStatus({ type: 'error', msg: t('errorType') });
         return;
       }
-      // بررسی حجم فایل (مثلاً زیر ۵ مگابایت)
       if (selectedFile.size > 5 * 1024 * 1024) {
-        setStatus({ type: 'error', msg: 'حجم عکس نباید بیشتر از ۵ مگابایت باشد.' });
+        setStatus({ type: 'error', msg: t('errorSize') });
         return;
       }
 
       setFile(selectedFile);
-      setPreview(URL.createObjectURL(selectedFile)); // نمایش پیش‌نمایش
+      setPreview(URL.createObjectURL(selectedFile)); 
       setStatus(null);
     }
   };
@@ -42,7 +43,7 @@ export default function SendImagePage() {
     e.preventDefault();
     
     if (!phone || !file) {
-      setStatus({ type: 'error', msg: 'لطفاً شماره و عکس را انتخاب کنید.' });
+      setStatus({ type: 'error', msg: t('errorInput') });
       return;
     }
 
@@ -57,27 +58,27 @@ export default function SendImagePage() {
       formData.append("file", file);
       if (caption) formData.append("caption", caption);
 
-      // ۱. دریافت توکن از حافظه مرورگر
-      const token = localStorage.getItem("token"); // یا هر نامی که توکن را با آن ذخیره کردید
+      const token = localStorage.getItem("token");
 
-      // ۲. ارسال درخواست با هدر Authorization
-      const response = await fetch("http://localhost:3000/whatsapp/upload-image", {
+      // استفاده از آدرس کامل (یا متغیر محیطی)
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+      
+      const response = await fetch(`${baseUrl}/whatsapp/upload-image`, {
         method: "POST",
         headers: {
-          // ⚠️ نکته حیاتی: Content-Type را ننویسید، اما Authorization را باید بنویسید
+          // Content-Type نباید ست شود (خودکار توسط مرورگر برای FormData ست می‌شود)
           ...(token ? { "Authorization": `Bearer ${token}` } : {})
         },
         body: formData,
       });
 
-      // ۳. بررسی دقیق خطا
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({})); // اگر جیسون نبود، خالی برگردان
-        console.error("Server Error Details:", errorData); // لاگ کردن متن دقیق خطا در کنسول
-        throw new Error(errorData.message || `خطای سرور: ${response.status}`);
+        const errorData = await response.json().catch(() => ({}));
+        console.error("Server Error Details:", errorData);
+        throw new Error(errorData.message || `Error: ${response.status}`);
       }
 
-      setStatus({ type: 'success', msg: 'عکس با موفقیت ارسال شد!' });
+      setStatus({ type: 'success', msg: t('success') });
       
       setFile(null);
       setPreview(null);
@@ -85,19 +86,23 @@ export default function SendImagePage() {
 
     } catch (error: any) {
       console.error("Upload Error:", error);
-      setStatus({ type: 'error', msg: error.message || "خطا در برقراری ارتباط با سرور." });
+      const errorMsg = error.message || tCommon('error');
+      setStatus({ type: 'error', msg: errorMsg });
     } finally {
       setLoading(false);
     }
   };
 
-  
   return (
     <div className="max-w-2xl mx-auto space-y-6 animate-in fade-in duration-500 py-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">ارسال تصویر</h2>
-          <p className="text-muted-foreground mt-1">ارسال عکس به مخاطبین واتساپ.</p>
+          <h2 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
+            {t('title')}
+          </h2>
+          <p className="text-muted-foreground mt-1">
+            {t('description')}
+          </p>
         </div>
       </div>
 
@@ -106,10 +111,10 @@ export default function SendImagePage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <ImageIcon className="h-5 w-5 text-purple-600" />
-              آپلود و ارسال
+              {t('uploadTitle')}
             </CardTitle>
             <CardDescription>
-              فایل عکس را انتخاب کنید. فرمت‌های مجاز: JPG, PNG, WEBP
+              {t('uploadDesc')}
             </CardDescription>
           </CardHeader>
           
@@ -117,7 +122,9 @@ export default function SendImagePage() {
             {status && (
               <Alert variant={status.type === 'error' ? "destructive" : "default"} className={status.type === 'success' ? "bg-green-50 text-green-700 border-green-200" : ""}>
                 {status.type === 'success' ? <CheckCircle2 className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
-                <AlertTitle>{status.type === 'success' ? "موفق" : "خطا"}</AlertTitle>
+                <AlertTitle>
+                    {status.type === 'success' ? tCommon('success') : tCommon('error')}
+                </AlertTitle>
                 <AlertDescription>{status.msg}</AlertDescription>
               </Alert>
             )}
@@ -126,22 +133,22 @@ export default function SendImagePage() {
             <div className="space-y-2">
               <Label htmlFor="phone" className="flex items-center gap-2">
                 <Phone className="h-4 w-4 text-slate-500" />
-                شماره موبایل
+                {t('phoneLabel')}
               </Label>
               <Input
                 id="phone"
-                placeholder="مثال: 09123456789"
+                placeholder="0912..."
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 className="font-mono text-left dir-ltr"
               />
             </div>
 
-            {/* ورودی فایل (Drag & Drop ساده) */}
+            {/* ورودی فایل */}
             <div className="space-y-2">
               <Label className="flex items-center gap-2">
                 <UploadCloud className="h-4 w-4 text-slate-500" />
-                انتخاب عکس
+                {t('selectImage')}
               </Label>
               
               {!preview ? (
@@ -154,8 +161,8 @@ export default function SendImagePage() {
                   />
                   <div className="flex flex-col items-center gap-2 text-slate-400">
                     <ImageIcon className="h-10 w-10 mb-2 opacity-50" />
-                    <span className="text-sm font-medium">برای انتخاب عکس کلیک کنید</span>
-                    <span className="text-xs">یا عکس را اینجا رها کنید</span>
+                    <span className="text-sm font-medium">{t('clickToSelect')}</span>
+                    <span className="text-xs">{t('dropHere')}</span>
                   </div>
                 </div>
               ) : (
@@ -168,19 +175,19 @@ export default function SendImagePage() {
                       size="sm"
                       onClick={() => { setFile(null); setPreview(null); }}
                     >
-                      حذف عکس
+                      {t('removeImage')}
                     </Button>
                   </div>
                 </div>
               )}
             </div>
 
-            {/* ورودی کپشن (اختیاری) */}
+            {/* ورودی کپشن */}
             <div className="space-y-2">
-               <Label htmlFor="caption" className="text-xs text-muted-foreground">کپشن (توضیحات عکس) - اختیاری</Label>
+               <Label htmlFor="caption" className="text-xs text-muted-foreground">{t('captionLabel')}</Label>
                <Input 
                  id="caption"
-                 placeholder="توضیحی برای عکس بنویسید..."
+                 placeholder={t('captionPlaceholder')}
                  value={caption}
                  onChange={(e) => setCaption(e.target.value)}
                />
@@ -191,12 +198,12 @@ export default function SendImagePage() {
           <CardFooter className="bg-slate-50 dark:bg-slate-900/50 border-t border-slate-100 dark:border-slate-800 flex justify-end py-4">
             <Button 
               type="submit" 
-              className="bg-purple-600 hover:bg-purple-700 w-32" 
+              className="bg-purple-600 hover:bg-purple-700 w-36" 
               disabled={loading || !phone || !file}
             >
               {loading ? <Loader2 className="animate-spin h-4 w-4" /> : (
                 <>
-                  ارسال عکس
+                  {t('sendBtn')}
                   <Send className="mr-2 h-4 w-4 rotate-180" /> 
                 </>
               )}

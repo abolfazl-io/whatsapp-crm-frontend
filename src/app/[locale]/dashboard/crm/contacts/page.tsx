@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { useTranslations } from "next-intl"; // 👈 هوک ترجمه
 import { api } from "@/lib/api";
 import { 
   Card, CardContent 
@@ -17,7 +19,6 @@ import {
   Search, Users, Phone, Eye, Loader2, User, RefreshCcw
 } from "lucide-react";
 
-// اینترفیس بر اساس خروجی GET /crm/contacts
 interface Contact {
   id: number;
   phone: string;
@@ -26,32 +27,32 @@ interface Contact {
 }
 
 export default function ContactsListPage() {
+  const t = useTranslations('CrmContacts'); // 👈 کلید ترجمه
+  const pathname = usePathname();
+  const currentLocale = pathname.split('/')[1] || 'fa';
+
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
 
-  // دریافت اطلاعات از سرور
   const fetchContacts = async (query = "") => {
     setLoading(true);
     try {
-      // ارسال پارامتر search به کوئری استرینگ
       const res = await api.get(`/crm/contacts`, {
         params: { search: query }
       });
       setContacts(res.data);
     } catch (error) {
-      console.error("خطا در دریافت لیست مخاطبین:", error);
+      console.error("Error fetching contacts:", error);
     } finally {
       setLoading(false);
     }
   };
 
-  // لود اولیه صفحه
   useEffect(() => {
     fetchContacts();
   }, []);
 
-  // هندل کردن جستجو
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     fetchContacts(searchTerm);
@@ -65,30 +66,30 @@ export default function ContactsListPage() {
         <div>
           <h1 className="text-3xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
             <Users className="h-8 w-8 text-blue-600" />
-            لیست مشتریان
+            {t('title')}
           </h1>
-          <p className="text-slate-500 mt-1">مدیریت تمام مخاطبین ذخیره شده در سیستم CRM.</p>
+          <p className="text-slate-500 mt-1">{t('description')}</p>
         </div>
 
         <form onSubmit={handleSearch} className="flex w-full md:w-auto gap-2">
           <div className="relative flex-1 md:w-64">
             <Search className="absolute right-3 top-2.5 h-4 w-4 text-slate-400" />
             <Input 
-              placeholder="جستجو با نام یا شماره..." 
+              placeholder={t('searchPlaceholder')} 
               className="pr-9"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
           <Button type="submit" className="bg-blue-600 hover:bg-blue-700">
-            جستجو
+            {t('searchBtn')}
           </Button>
           <Button 
             type="button" 
             variant="outline" 
             size="icon" 
             onClick={() => { setSearchTerm(""); fetchContacts(""); }}
-            title="بازنشانی"
+            title={t('resetBtn')}
           >
             <RefreshCcw className="h-4 w-4" />
           </Button>
@@ -101,11 +102,11 @@ export default function ContactsListPage() {
           <Table>
             <TableHeader>
               <TableRow className="bg-slate-50 dark:bg-slate-900/50">
-                <TableHead className="w-[70px] text-center">تصویر</TableHead>
-                <TableHead className="text-right">نام مشتری</TableHead>
-                <TableHead className="text-right">شماره تماس</TableHead>
-                <TableHead className="text-right">برچسب‌ها</TableHead>
-                <TableHead className="text-left">عملیات</TableHead>
+                <TableHead className="w-[70px] text-center">{t('table.image')}</TableHead>
+                <TableHead className="text-right">{t('table.name')}</TableHead>
+                <TableHead className="text-right">{t('table.phone')}</TableHead>
+                <TableHead className="text-right">{t('table.tags')}</TableHead>
+                <TableHead className="text-left">{t('table.actions')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -114,14 +115,14 @@ export default function ContactsListPage() {
                    <TableCell colSpan={5} className="h-32 text-center">
                      <div className="flex justify-center items-center gap-2 text-slate-500">
                         <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
-                        <span>در حال بارگذاری لیست...</span>
+                        <span>{t('loading')}</span>
                      </div>
                    </TableCell>
                  </TableRow>
               ) : contacts.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={5} className="h-32 text-center text-slate-500">
-                    موردی یافت نشد.
+                    {t('noData')}
                   </TableCell>
                 </TableRow>
               ) : (
@@ -131,7 +132,7 @@ export default function ContactsListPage() {
                     {/* آواتار */}
                     <TableCell className="text-center py-3">
                       <Avatar className="h-10 w-10 border mx-auto">
-                        <AvatarImage src="" /> {/* اگر آواتار دارید اینجا قرار دهید */}
+                        <AvatarImage src="" />
                         <AvatarFallback className="bg-blue-50 text-blue-600 font-bold">
                           {contact.pushName ? contact.pushName[0] : <User className="h-5 w-5" />}
                         </AvatarFallback>
@@ -140,7 +141,7 @@ export default function ContactsListPage() {
 
                     {/* نام */}
                     <TableCell className="font-medium text-slate-700">
-                      {contact.pushName || <span className="text-slate-400 italic">بدون نام</span>}
+                      {contact.pushName || <span className="text-slate-400 italic">{t('noName')}</span>}
                     </TableCell>
                     
                     {/* شماره تلفن */}
@@ -171,12 +172,12 @@ export default function ContactsListPage() {
                       </div>
                     </TableCell>
 
-                    {/* دکمه مشاهده پروفایل */}
+                    {/* دکمه مشاهده پروفایل (لینک اصلاح شد) */}
                     <TableCell className="text-left">
-                      <Link href={`/dashboard/crm/contacts/${contact.phone}`}>
+                      <Link href={`/${currentLocale}/dashboard/crm/contacts/${contact.phone}`}>
                         <Button variant="ghost" size="sm" className="text-blue-600 hover:text-blue-700 hover:bg-blue-50">
                           <Eye className="h-4 w-4 ml-1" />
-                          پروفایل
+                          {t('profileBtn')}
                         </Button>
                       </Link>
                     </TableCell>
