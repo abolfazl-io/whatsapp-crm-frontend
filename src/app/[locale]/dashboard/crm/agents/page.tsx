@@ -27,7 +27,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { 
   Plus, Loader2, Trash2, Shield, MessageSquare, 
-  Image as ImageIcon, FileText, Users, Eye, KeyRound, Pencil // 👈 آیکون ویرایش
+  Image as ImageIcon, FileText, Users, Eye, KeyRound, Pencil 
 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
@@ -52,7 +52,6 @@ export default function AgentsPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [submitLoading, setSubmitLoading] = useState(false);
   
-  // 🆕 استیت برای تشخیص حالت ویرایش
   const [editingAgent, setEditingAgent] = useState<Agent | null>(null);
 
   const initialFormState = {
@@ -84,20 +83,18 @@ export default function AgentsPage() {
     }
   };
 
-  // 🆕 تابع باز کردن مودال برای افزودن (ریست کردن فرم)
   const openAddModal = () => {
     setEditingAgent(null);
     setFormData(initialFormState);
     setIsDialogOpen(true);
   };
 
-  // 🆕 تابع باز کردن مودال برای ویرایش (پر کردن فرم)
   const openEditModal = (agent: Agent) => {
     setEditingAgent(agent);
     setFormData({
       name: agent.name,
       email: agent.email || "",
-      password: "", // رمز عبور را خالی می‌گذاریم (اگر کاربر پر نکند، تغییر نمی‌کند)
+      password: "", 
       canSendMessage: agent.canSendMessage,
       canSendImage: agent.canSendImage,
       canSendFile: agent.canSendFile,
@@ -114,14 +111,12 @@ export default function AgentsPage() {
     
     try {
       if (editingAgent) {
-        // 🔄 حالت ویرایش (Update)
         const payload: any = { ...formData };
-        if (!payload.password) delete payload.password; // اگر رمز خالی بود، ارسال نکن
+        if (!payload.password) delete payload.password; 
 
         await api.patch(`/crm/agents/${editingAgent.id}`, payload);
-        alert("اطلاعات با موفقیت بروزرسانی شد"); // یا استفاده از toast
+        alert(t('successEdit')); 
       } else {
-        // ➕ حالت افزودن (Create)
         await api.post("/crm/agents", formData);
         alert(t('successAdd'));
       }
@@ -130,7 +125,7 @@ export default function AgentsPage() {
       setIsDialogOpen(false);
     } catch (error) {
       console.error(error);
-      alert(editingAgent ? "خطا در ویرایش" : t('errorAdd'));
+      alert(editingAgent ? t('errorEdit') : t('errorAdd'));
     } finally {
       setSubmitLoading(false);
     }
@@ -158,7 +153,7 @@ export default function AgentsPage() {
         <span className={`text-sm ${checked ? "text-blue-700 font-medium" : "text-slate-500"}`}>{label}</span>
       </div>
       <div className={`w-8 h-4 rounded-full relative transition-colors ${checked ? "bg-blue-500" : "bg-slate-300"}`}>
-        <div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-all shadow-sm ${checked ? "left-0.5" : "left-4.5"}`} style={{left: checked ? '4px' : '18px'}} />
+        <div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-all shadow-sm rtl:right-0.5 ltr:left-0.5 ${checked ? "rtl:translate-x-[-14px] ltr:translate-x-[14px]" : "translate-x-0"}`} />
       </div>
     </div>
   );
@@ -172,21 +167,19 @@ export default function AgentsPage() {
             <p className="text-slate-500 mt-1">{t('description')}</p>
         </div>
 
-        {/* دکمه افزودن */}
         <Button onClick={openAddModal} className="bg-blue-600 hover:bg-blue-700">
-            <Plus className="mr-2 h-4 w-4" />
+            <Plus className="ltr:mr-2 rtl:ml-2 h-4 w-4" />
             {t('addBtn')}
         </Button>
 
-        {/* مودال (دیالوگ) مشترک برای افزودن و ویرایش */}
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogContent className="sm:max-w-[600px]">
             <DialogHeader>
               <DialogTitle>
-                {editingAgent ? "ویرایش اطلاعات و دسترسی‌ها" : t('dialog.title')}
+                {editingAgent ? t('dialog.editTitle') : t('dialog.title')}
               </DialogTitle>
               <DialogDescription>
-                {editingAgent ? "اطلاعات مورد نظر را تغییر داده و ذخیره کنید." : t('dialog.desc')}
+                {editingAgent ? t('dialog.editDesc') : t('dialog.desc')}
               </DialogDescription>
             </DialogHeader>
             
@@ -203,7 +196,7 @@ export default function AgentsPage() {
                 <div className="grid gap-2 col-span-2">
                     <Label htmlFor="password">
                         {t('dialog.passwordLabel')} 
-                        {editingAgent && <span className="text-xs text-slate-400 mr-2">(برای تغییر نکردن خالی بگذارید)</span>}
+                        {editingAgent && <span className="text-xs text-slate-400 mx-2">{t('dialog.passwordHint')}</span>}
                     </Label>
                     <Input 
                         id="password" 
@@ -211,7 +204,7 @@ export default function AgentsPage() {
                         dir="ltr" 
                         value={formData.password} 
                         onChange={(e) => setFormData({...formData, password: e.target.value})} 
-                        required={!editingAgent} // فقط در حالت ساختن اجباری است
+                        required={!editingAgent} 
                         minLength={6} 
                     />
                 </div>
@@ -219,36 +212,36 @@ export default function AgentsPage() {
 
               <div className="space-y-3">
                 <Label className="text-slate-600 flex items-center gap-2">
-                    <Shield className="h-4 w-4" /> سطح دسترسی‌ها
+                    <Shield className="h-4 w-4" /> {t('dialog.permissionsLabel')}
                 </Label>
                 <div className="grid grid-cols-2 gap-3">
                     <ToggleItem 
-                        label="ارسال پیام" icon={MessageSquare} 
+                        label={t('permissions.sendMessage')} icon={MessageSquare} 
                         checked={formData.canSendMessage} 
                         onChange={(v: boolean) => setFormData({...formData, canSendMessage: v})} 
                     />
                     <ToggleItem 
-                        label="ارسال تصویر" icon={ImageIcon} 
+                        label={t('permissions.sendImage')} icon={ImageIcon} 
                         checked={formData.canSendImage} 
                         onChange={(v: boolean) => setFormData({...formData, canSendImage: v})} 
                     />
                     <ToggleItem 
-                        label="ارسال فایل" icon={FileText} 
+                        label={t('permissions.sendFile')} icon={FileText} 
                         checked={formData.canSendFile} 
                         onChange={(v: boolean) => setFormData({...formData, canSendFile: v})} 
                     />
                     <ToggleItem 
-                        label="مشاهده تیم‌باکس" icon={Users} 
+                        label={t('permissions.viewInbox')} icon={Users} 
                         checked={formData.canViewInbox} 
                         onChange={(v: boolean) => setFormData({...formData, canViewInbox: v})} 
                     />
                     <ToggleItem 
-                        label="مشاهده مخاطبین" icon={Eye} 
+                        label={t('permissions.viewContacts')} icon={Eye} 
                         checked={formData.canViewContacts} 
                         onChange={(v: boolean) => setFormData({...formData, canViewContacts: v})} 
                     />
                     <ToggleItem 
-                        label="رمز پویا (OTP)" icon={KeyRound} 
+                        label={t('permissions.useOtp')} icon={KeyRound} 
                         checked={formData.canUseOtp} 
                         onChange={(v: boolean) => setFormData({...formData, canUseOtp: v})} 
                     />
@@ -257,7 +250,7 @@ export default function AgentsPage() {
 
               <DialogFooter className="mt-2">
                 <Button type="submit" disabled={submitLoading} className="w-full bg-blue-600 hover:bg-blue-700">
-                  {submitLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : (editingAgent ? "بروزرسانی تغییرات" : t('dialog.submitBtn'))}
+                  {submitLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : (editingAgent ? t('dialog.submitEditBtn') : t('dialog.submitAddBtn'))}
                 </Button>
               </DialogFooter>
             </form>
@@ -280,7 +273,7 @@ export default function AgentsPage() {
                         <TableHead>{t('table.name')}</TableHead>
                         <TableHead className="hidden md:table-cell">{t('table.email')}</TableHead>
                         <TableHead>{t('table.permissions')}</TableHead>
-                        <TableHead className="text-left">{t('table.actions')}</TableHead>
+                        <TableHead className="text-center md:text-end rtl:text-left ltr:text-right">{t('table.actions')}</TableHead>
                     </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -301,21 +294,21 @@ export default function AgentsPage() {
                         </TableCell>
                         <TableCell className="font-mono text-slate-500 hidden md:table-cell text-xs">{agent.email || "-"}</TableCell>
                         
-                        {/* ستون نمایش دسترسی‌ها */}
                         <TableCell>
                             <div className="flex flex-wrap gap-1">
-                                {agent.canSendMessage && <Badge variant="secondary" className="text-[10px] px-1 bg-green-50 text-green-700 border-green-100">Msg</Badge>}
-                                {agent.canSendFile && <Badge variant="secondary" className="text-[10px] px-1 bg-blue-50 text-blue-700 border-blue-100">File</Badge>}
-                                {agent.canUseOtp && <Badge variant="outline" className="text-[10px] px-1 border-orange-200 text-orange-600 font-bold">OTP</Badge>}
-                                {!agent.canSendMessage && !agent.canSendFile && !agent.canUseOtp && 
-                                    <span className="text-xs text-slate-300">بدون دسترسی ویژه</span>
+                                {agent.canSendMessage && <Badge variant="secondary" className="text-[10px] px-2 py-0.5 bg-green-50 text-green-700 border-green-200">{t('permissions.sendMessage')}</Badge>}
+                                {agent.canSendImage && <Badge variant="secondary" className="text-[10px] px-2 py-0.5 bg-purple-50 text-purple-700 border-purple-200">{t('permissions.sendImage')}</Badge>}
+                                {agent.canSendFile && <Badge variant="secondary" className="text-[10px] px-2 py-0.5 bg-blue-50 text-blue-700 border-blue-200">{t('permissions.sendFile')}</Badge>}
+                                {agent.canUseOtp && <Badge variant="outline" className="text-[10px] px-2 py-0.5 border-orange-200 text-orange-600 font-bold bg-orange-50">{t('permissions.useOtp')}</Badge>}
+                                
+                                {!agent.canSendMessage && !agent.canSendFile && !agent.canUseOtp && !agent.canSendImage && 
+                                    <span className="text-xs text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full border">{t('table.noPermissions')}</span>
                                 }
                             </div>
                         </TableCell>
 
-                        <TableCell className="text-left">
+                        <TableCell className="text-end rtl:text-left ltr:text-right">
                             <div className="flex items-center justify-end gap-1">
-                                {/* دکمه ویرایش ✏️ */}
                                 <Button 
                                     variant="ghost" 
                                     size="icon" 
@@ -324,8 +317,6 @@ export default function AgentsPage() {
                                 >
                                     <Pencil className="h-4 w-4" />
                                 </Button>
-
-                                {/* دکمه حذف 🗑️ */}
                                 <Button 
                                     variant="ghost" 
                                     size="icon" 

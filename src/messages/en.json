@@ -299,33 +299,8 @@
     "logConnected": "✅ Connected: {phone}",
     "logConnectionLost": "❌ Connection lost"
   },
-  "CrmAgents": {
-    "title": "Agents Management",
-    "description": "List of colleagues responding to chats.",
-    "addBtn": "Add New Agent",
-    "accessDenied": "You do not have permission to view this page.",
-    "successAdd": "Agent created successfully!",
-    "errorAdd": "Error creating agent.",
-    "successDelete": "Agent deleted.",
-    "errorDelete": "Delete failed. This agent might have active chats linked.",
-    "deleteConfirm": "Are you sure you want to delete this agent? This action cannot be undone.",
-    "listTitle": "Staff List ({count})",
-    "noAgents": "No agents defined yet.",
-    "table": {
-      "image": "Image",
-      "name": "Name",
-      "email": "Email",
-      "actions": "Actions"
-    },
-    "dialog": {
-      "title": "Define New Agent",
-      "desc": "Enter login details for the new colleague.",
-      "nameLabel": "Display Name",
-      "emailLabel": "Email",
-      "passwordLabel": "Password",
-      "submitBtn": "Register Agent"
-    }
-  },
+  
+  
   "CrmCanned": {
     "title": "Canned Responses",
     "description": "Manage frequent texts for faster replies.",
@@ -441,5 +416,47 @@
     "noData": "No conversations found.",
     "successAssign": "Conversation assigned to {name}.",
     "errorAssign": "Error assigning agent."
+  },
+  "CrmAgents": {
+    "title": "Agents Management",
+    "description": "Manage access levels and your team members.",
+    "addBtn": "Add Agent",
+    "dialog": {
+      "title": "Add New Agent",
+      "desc": "Enter the details and permissions for the new agent.",
+      "editTitle": "Edit Information & Permissions",
+      "editDesc": "Modify the details and save your changes.",
+      "nameLabel": "Full Name",
+      "emailLabel": "Email Address",
+      "passwordLabel": "Password",
+      "passwordHint": "(Leave blank to keep unchanged)",
+      "permissionsLabel": "Access Levels",
+      "submitAddBtn": "Add Agent",
+      "submitEditBtn": "Update Changes"
+    },
+    "permissions": {
+      "sendMessage": "Send Msg",
+      "sendImage": "Image",
+      "sendFile": "File",
+      "viewInbox": "Team Inbox",
+      "viewContacts": "Contacts",
+      "useOtp": "OTP"
+    },
+    "listTitle": "Agents List ({count})",
+    "noAgents": "No agents found.",
+    "table": {
+      "image": "Image",
+      "name": "Name",
+      "email": "Email",
+      "permissions": "Permissions",
+      "actions": "Actions",
+      "noPermissions": "No special access"
+    },
+    "successAdd": "Agent added successfully.",
+    "errorAdd": "Failed to add agent.",
+    "successEdit": "Information updated successfully.",
+    "errorEdit": "Failed to update agent.",
+    "deleteConfirm": "Are you sure you want to delete this agent?",
+    "errorDelete": "Failed to delete agent."
   }
 }
