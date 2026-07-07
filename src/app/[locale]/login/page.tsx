@@ -10,11 +10,14 @@ import { Label } from "@/components/ui/label";
 import { Loader2 } from "lucide-react";
 import Link from "next/link";
 
-export default function LoginPage() { // 👈 پارامتر params را از اینجا حذف کردیم
+export default function LoginPage() { 
   const t = useTranslations('Auth');
+  const tr = useTranslations('Testimonial');
   const router = useRouter();
-  const params = useParams(); // 👈 دریافت پارامترها با هوک
-  const locale = params.locale as string; // 👈 استخراج زبان
+  const params = useParams(); 
+  const locale = params.locale as string; 
+  const text = tr("quote");
+
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -51,7 +54,7 @@ export default function LoginPage() { // 👈 پارامتر params را از ا
         </div>
         <div className="space-y-4 max-w-lg">
           <blockquote className="text-2xl font-medium leading-relaxed">
-            "این پلتفرم به تیم ما کمک کرد تا فروش خود را در کمتر از یک ماه دو برابر کنیم. مدیریت مشتریان هرگز به این سادگی نبوده است."
+            "{text}"
           </blockquote>
           <footer className="text-sm text-slate-400">Sofia Davis - مدیر فروش</footer>
         </div>

@@ -458,5 +458,10 @@
     "errorEdit": "Failed to update agent.",
     "deleteConfirm": "Are you sure you want to delete this agent?",
     "errorDelete": "Failed to delete agent."
+  },
+  "Testimonial": {
+    "quote": "This platform helped our team double our sales in less than a month. Managing customers has never been easier.",
+    "author": "Sofia Davis",
+    "role": "Sales Manager"
   }
 }
